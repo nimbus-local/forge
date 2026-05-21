@@ -184,6 +184,7 @@ their identifiers as environment variables.
 | `NewSecret` | SSM SecureString at deploy time | `SST_SECRET_<NAME>` |
 | `NewStaticSite` | S3 + CloudFront static website | `SST_SITE_<NAME>_URL` |
 | `NewNextjsSite` | Next.js on S3 + CloudFront + Lambda | `SST_SITE_<NAME>_URL` |
+| `NewService` | ECS Fargate service + optional ALB | `SST_SERVICE_<NAME>_URL` |
 
 ### Cloudflare
 
@@ -282,9 +283,9 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
-- [ ] Full godoc documentation
-- [ ] Fargate / ECS construct
-- [ ] GitHub Actions CI integration guide
+- [x] Full godoc documentation
+- [x] Fargate / ECS construct (`NewService`)
+- [x] GitHub Actions CI integration guide
 - [ ] Web console (`forge console`)
 
 ---
