@@ -15,13 +15,18 @@ func qualifiedName(ctx *forge.RunContext, name string) string {
 	return fmt.Sprintf("%s-%s-%s", ctx.App.Name, ctx.Stage, name)
 }
 
-// defaultTags returns the standard set of resource tags used by all constructs.
+// defaultTags returns the standard set of resource tags used by all constructs,
+// merged with any extra tags defined in the active StageConfig.
 func defaultTags(ctx *forge.RunContext, name string) pulumi.StringMap {
-	return pulumi.StringMap{
+	tags := pulumi.StringMap{
 		"forge:app":   pulumi.String(ctx.App.Name),
 		"forge:stage": pulumi.String(ctx.Stage),
 		"forge:name":  pulumi.String(name),
 	}
+	for k, v := range ctx.ExtraTags() {
+		tags[k] = pulumi.String(v)
+	}
+	return tags
 }
 
 // envKey converts a camelCase or kebab-case name to SCREAMING_SNAKE_CASE
