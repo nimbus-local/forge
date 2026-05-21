@@ -152,6 +152,7 @@ forge secret remove <NAME>            Delete a secret
 forge secret list                     List all secrets for stage
 forge migrate [sst.config.ts]         Convert TS config to Go
 forge bootstrap [--stage <stage>]     Create the Pulumi state S3 bucket
+forge console   [--stage <stage>]     Open the web console (outputs, resources, secrets)
 ```
 
 ### Global flags

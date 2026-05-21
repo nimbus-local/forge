@@ -54,6 +54,7 @@ forge is a Go-native drop-in replacement for SST (Serverless Stack). It replaces
 | [State](concepts/state.md) | S3 Pulumi state backend, bootstrap, SST Ion migration |
 | [Cloudflare](concepts/cloudflare.md) | Deploying Workers, KV, D1, and R2 alongside or instead of AWS |
 | [GitHub Actions CI/CD](concepts/ci.md) | OIDC auth, multi-stage pipelines, PR previews, secret management |
+| [Web Console](concepts/console.md) | `forge console` — stack outputs, resources, and secrets in the browser |
 
 ---
 
