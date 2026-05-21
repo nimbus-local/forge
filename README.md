@@ -278,7 +278,6 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
-- [ ] Deploy output summary table (created / updated / deleted counts)
 - [ ] Full godoc documentation
 - [ ] `NextjsSite` / `StaticSite` constructs
 - [ ] Fargate / ECS construct
