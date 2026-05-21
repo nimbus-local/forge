@@ -64,6 +64,7 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(secretCmd)
 	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(stagesCmd)
 }
 
 func main() {

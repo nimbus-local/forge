@@ -22,8 +22,9 @@ import (
 // Config is the top-level definition of your infrastructure.
 // Create one in infra/sst.config.go and pass it to forge.Run().
 type Config struct {
-	App *AppConfig
-	Run func(ctx *RunContext) error
+	App    *AppConfig
+	Stages map[string]*StageConfig // per-stage overrides; key is the stage name
+	Run    func(ctx *RunContext) error
 }
 
 // AppConfig holds project-level metadata.
@@ -37,18 +38,54 @@ type AppConfig struct {
 type RemovalPolicy string
 
 const (
-	RemovalDestroy             RemovalPolicy = "destroy"
-	RemovalRetain              RemovalPolicy = "retain"
-	RemovalRetainOnProtection  RemovalPolicy = "retain-on-protection"
+	RemovalDestroy            RemovalPolicy = "destroy"
+	RemovalRetain             RemovalPolicy = "retain"
+	RemovalRetainOnProtection RemovalPolicy = "retain-on-protection"
 )
+
+// StageConfig holds per-stage overrides applied on top of the base AppConfig.
+type StageConfig struct {
+	// Removal overrides the base AppConfig removal policy for this stage.
+	Removal RemovalPolicy
+	// AWSProfile uses a different AWS credentials profile when deploying this stage.
+	AWSProfile string
+	// AWSRegion deploys this stage to a different AWS region.
+	AWSRegion string
+	// Protected means `forge remove` requires --force to proceed.
+	Protected bool
+	// Tags adds extra resource tags for every resource in this stage.
+	Tags map[string]string
+}
 
 // RunContext is passed to your Config.Run function.
 // Use it to create constructs and export stack outputs.
 type RunContext struct {
-	pulumiCtx *pulumi.Context
-	Stage     string
-	App       *AppConfig
-	DevMode   bool // true when running `forge dev`
+	pulumiCtx   *pulumi.Context
+	Stage       string
+	App         *AppConfig
+	DevMode     bool
+	IsProtected bool
+	stageTags   map[string]string
+}
+
+// IsProduction returns true when the active stage is "production" or "prod".
+func (r *RunContext) IsProduction() bool {
+	return r.Stage == "production" || r.Stage == "prod"
+}
+
+// StageIn returns true if the active stage matches any of the provided names.
+func (r *RunContext) StageIn(stages ...string) bool {
+	for _, s := range stages {
+		if r.Stage == s {
+			return true
+		}
+	}
+	return false
+}
+
+// ExtraTags returns the additional resource tags configured for this stage via StageConfig.Tags.
+func (r *RunContext) ExtraTags() map[string]string {
+	return r.stageTags
 }
 
 // Pulumi returns the underlying pulumi.Context for advanced use cases.
@@ -100,16 +137,41 @@ func Run(cfg *Config) {
 		stage = "dev"
 	}
 
+	// Resolve per-stage overrides.
+	var stageCfg *StageConfig
+	if cfg.Stages != nil {
+		stageCfg = cfg.Stages[stage]
+	}
+	if stageCfg != nil {
+		if stageCfg.AWSProfile != "" {
+			os.Setenv("AWS_PROFILE", stageCfg.AWSProfile)
+		}
+		if stageCfg.AWSRegion != "" {
+			os.Setenv("AWS_DEFAULT_REGION", stageCfg.AWSRegion)
+		}
+		if stageCfg.Removal != "" {
+			cfg.App.Removal = stageCfg.Removal
+		}
+	}
+
 	mode := os.Getenv("FORGE_MODE")
+
+	// Guard: block remove on protected stages without --force.
+	if mode == "remove" && stageCfg != nil && stageCfg.Protected {
+		if os.Getenv("FORGE_FORCE_REMOVE") != "true" {
+			fatal(fmt.Sprintf("forge: stage %q is protected — use `forge remove --force` to override", stage))
+		}
+	}
+
 	switch mode {
 	case "deploy":
-		must(runPulumi(cfg, stage, "up"))
+		must(runPulumi(cfg, stage, stageCfg, "up"))
 	case "remove":
-		must(runPulumi(cfg, stage, "destroy"))
+		must(runPulumi(cfg, stage, stageCfg, "destroy"))
 	case "diff":
-		must(runPulumi(cfg, stage, "preview"))
+		must(runPulumi(cfg, stage, stageCfg, "preview"))
 	case "dev":
-		must(runPulumi(cfg, stage, "dev"))
+		must(runPulumi(cfg, stage, stageCfg, "dev"))
 	default:
 		fmt.Fprintln(os.Stderr, "forge: run via the forge CLI")
 		fmt.Fprintln(os.Stderr, "  forge deploy    Deploy your stack")
@@ -122,7 +184,7 @@ func Run(cfg *Config) {
 
 // ── Internal Pulumi runner ────────────────────────────────────────────────────
 
-func runPulumi(cfg *Config, stage, action string) error {
+func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) error {
 	ctx := context.Background()
 	stackName := auto.FullyQualifiedStackName("organization", cfg.App.Name, stage)
 	devMode := action == "dev"
@@ -130,10 +192,12 @@ func runPulumi(cfg *Config, stage, action string) error {
 	// Build the inline Pulumi program from the user's Run func.
 	pulumiProg := func(pulumiCtx *pulumi.Context) error {
 		runCtx := &RunContext{
-			pulumiCtx: pulumiCtx,
-			Stage:     stage,
-			App:       cfg.App,
-			DevMode:   devMode,
+			pulumiCtx:   pulumiCtx,
+			Stage:       stage,
+			App:         cfg.App,
+			DevMode:     devMode,
+			IsProtected: stageCfg != nil && stageCfg.Protected,
+			stageTags:   stageCfgTags(stageCfg),
 		}
 		return cfg.Run(runCtx)
 	}
@@ -219,4 +283,11 @@ func must(err error) {
 func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
+}
+
+func stageCfgTags(s *StageConfig) map[string]string {
+	if s == nil {
+		return nil
+	}
+	return s.Tags
 }

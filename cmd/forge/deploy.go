@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -60,9 +61,8 @@ and destroy everything including retained resources.`,
 		fmt.Println()
 
 		if force {
-			// Signal the library to ignore RemovalRetain.
-			// We do this via an extra env var picked up by forge.Run().
-			_ = appendEnv(nil, "FORGE_FORCE_REMOVE", "true")
+			// Propagate to the infra subprocess so forge.Run() bypasses the protection guard.
+			os.Setenv("FORGE_FORCE_REMOVE", "true")
 		}
 
 		return runConfig("remove", stage)
