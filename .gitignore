@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+/bin/
+/dist/
+
+# Go test & coverage
+*.out
+coverage.html
+
+# Go workspace
+go.work.sum
+
+# Vendor
+/vendor/
+
+# Pulumi local workspace
+.pulumi/
+Pulumi.*.yaml
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swo~
+*~
+
