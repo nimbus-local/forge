@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
@@ -30,8 +32,8 @@ type Config struct {
 // AppConfig holds project-level metadata.
 type AppConfig struct {
 	Name       string
-	Home       string              // "aws" | "cloudflare" | "aws+cloudflare"
-	Removal    RemovalPolicy       // default: RemovalDestroy
+	Home       string        // "aws" | "cloudflare" | "aws+cloudflare"
+	Removal    RemovalPolicy // default: RemovalDestroy
 	Cloudflare *CloudflareConfig
 }
 
@@ -251,7 +253,17 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 	}
 
 	switch action {
-	case "up", "dev":
+	case "up":
+		res, upErr := stack.Up(ctx,
+			optup.ProgressStreams(os.Stdout),
+			optup.ErrorProgressStreams(os.Stderr),
+		)
+		if upErr == nil {
+			printDeploySummary(res)
+		}
+		return upErr
+
+	case "dev":
 		_, err = stack.Up(ctx,
 			optup.ProgressStreams(os.Stdout),
 			optup.ErrorProgressStreams(os.Stderr),
@@ -259,18 +271,24 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		return err
 
 	case "destroy":
-		_, err = stack.Destroy(ctx,
+		res, destroyErr := stack.Destroy(ctx,
 			optdestroy.ProgressStreams(os.Stdout),
 			optdestroy.ErrorProgressStreams(os.Stderr),
 		)
-		return err
+		if destroyErr == nil {
+			printDestroySummary(res)
+		}
+		return destroyErr
 
 	case "preview":
-		_, err = stack.Preview(ctx,
+		res, previewErr := stack.Preview(ctx,
 			optpreview.ProgressStreams(os.Stdout),
 			optpreview.ErrorProgressStreams(os.Stderr),
 		)
-		return err
+		if previewErr == nil {
+			printPreviewSummary(res)
+		}
+		return previewErr
 	}
 	return nil
 }
@@ -304,6 +322,108 @@ func must(err error) {
 func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
+}
+
+// ── Deploy output ─────────────────────────────────────────────────────────────
+
+// printDeploySummary prints a formatted change + output summary after a successful deploy.
+func printDeploySummary(res auto.UpResult) {
+	fmt.Println()
+	if res.Summary.ResourceChanges != nil {
+		printChangeSummary(*res.Summary.ResourceChanges)
+	}
+	printOutputs(res.Outputs)
+}
+
+// printDestroySummary prints the resource counts removed after a successful destroy.
+func printDestroySummary(res auto.DestroyResult) {
+	fmt.Println()
+	if res.Summary.ResourceChanges != nil {
+		printChangeSummary(*res.Summary.ResourceChanges)
+	}
+	fmt.Println()
+}
+
+// printPreviewSummary prints the expected changes from a diff/preview run.
+func printPreviewSummary(res auto.PreviewResult) {
+	fmt.Println()
+	counts := make(map[string]int, len(res.ChangeSummary))
+	for op, n := range res.ChangeSummary {
+		counts[string(op)] = n
+	}
+	printChangeSummary(counts)
+	fmt.Println()
+}
+
+// printChangeSummary formats resource change counts into a single line.
+func printChangeSummary(changes map[string]int) {
+	order := []string{"create", "update", "replace", "delete", "same"}
+	labels := map[string]string{
+		"create":  "created",
+		"update":  "updated",
+		"replace": "replaced",
+		"delete":  "deleted",
+		"same":    "unchanged",
+	}
+
+	var parts []string
+	for _, op := range order {
+		n := changes[op]
+		if n == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", n, labels[op]))
+	}
+	// Append any op types not in the ordered list above.
+	for op, n := range changes {
+		known := false
+		for _, o := range order {
+			if o == op {
+				known = true
+				break
+			}
+		}
+		if !known && n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, op))
+		}
+	}
+
+	if len(parts) == 0 {
+		fmt.Println("  No changes.")
+		return
+	}
+	fmt.Printf("  Changes   %s\n", strings.Join(parts, "  ·  "))
+}
+
+// printOutputs prints the stack outputs in a left-aligned table.
+func printOutputs(outputs auto.OutputMap) {
+	if len(outputs) == 0 {
+		fmt.Println()
+		return
+	}
+
+	// Measure the longest key for alignment.
+	maxLen := 0
+	keys := make([]string, 0, len(outputs))
+	for k := range outputs {
+		keys = append(keys, k)
+		if len(k) > maxLen {
+			maxLen = len(k)
+		}
+	}
+	sort.Strings(keys)
+
+	fmt.Println()
+	fmt.Println("  Outputs")
+	for _, k := range keys {
+		v := outputs[k]
+		if v.Secret {
+			fmt.Printf("    %-*s  [secret]\n", maxLen, k)
+		} else {
+			fmt.Printf("    %-*s  %v\n", maxLen, k, v.Value)
+		}
+	}
+	fmt.Println()
 }
 
 // validateCFCredentials returns an error if no Cloudflare authentication env vars are set.
