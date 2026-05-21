@@ -59,6 +59,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", "", "Path to sst.config.go (default: ./infra/sst.config.go or ./sst.config.go)")
 
 	rootCmd.AddCommand(bootstrapCmd)
+	rootCmd.AddCommand(consoleCmd)
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(removeCmd)

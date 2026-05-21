@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>forge console</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #7c3aed;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --r: 6px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --mono: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 24px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 10;
+  }
+  .brand { font-weight: 600; font-size: 15px; letter-spacing: -0.3px; }
+  .brand-dot { color: var(--accent); }
+  .stage-pill {
+    display: none; align-items: center; gap: 6px;
+    padding: 3px 10px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 20px;
+    font-size: 12px; color: var(--muted);
+  }
+  .stage-pill.visible { display: flex; }
+  .stage-pill b { color: var(--text); font-weight: 500; }
+  .spacer { flex: 1; }
+  .refresh-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--r);
+    color: var(--text); font-size: 13px; cursor: pointer; transition: background 0.15s;
+  }
+  .refresh-btn:hover { background: var(--border); }
+  .refresh-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+  /* Tabs */
+  nav {
+    display: flex; padding: 0 24px;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .tab-btn {
+    padding: 10px 16px; background: none; border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; font-size: 11px; color: var(--muted);
+  }
+
+  /* Main */
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* States */
+  .state-msg {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 64px 24px;
+    color: var(--muted); font-size: 13px; gap: 10px; text-align: center;
+  }
+  .state-msg .icon { font-size: 30px; }
+  .state-msg code { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--surface2); padding: 2px 6px; border-radius: 4px; }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+  .data-table th {
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+    text-align: left; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted);
+  }
+  .data-table td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .muted { color: var(--muted); }
+
+  .value-cell { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+  .value-cell a { color: var(--blue); text-decoration: none; }
+  .value-cell a:hover { text-decoration: underline; }
+
+  .copy-btn {
+    padding: 3px 10px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--muted); font-size: 11px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .copy-btn:hover { background: var(--border); color: var(--text); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+  .type-badge {
+    display: inline-block; padding: 2px 8px;
+    background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 4px; font-size: 11px; font-family: var(--mono); color: #a78bfa;
+  }
+  .secret-badge {
+    display: inline-block; padding: 2px 8px;
+    background: rgba(63,185,80,0.12); border: 1px solid rgba(63,185,80,0.25);
+    border-radius: 4px; font-size: 11px; font-family: var(--mono); color: var(--green);
+  }
+
+  /* Spin animation for loading icon */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinning { display: inline-block; animation: spin 1s linear infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">forge<span class="brand-dot">.</span>console</div>
+  <div class="stage-pill" id="stage-pill">
+    <span id="hdr-app"></span> / <b id="hdr-stage"></b>
+  </div>
+  <div class="spacer"></div>
+  <button class="refresh-btn" id="refresh-btn" onclick="loadData()">
+    <span id="refresh-icon">↺</span> Refresh
+  </button>
+</header>
+
+<nav>
+  <button class="tab-btn active" data-tab="outputs" onclick="switchTab('outputs')">
+    Outputs <span class="badge" id="badge-outputs">—</span>
+  </button>
+  <button class="tab-btn" data-tab="resources" onclick="switchTab('resources')">
+    Resources <span class="badge" id="badge-resources">—</span>
+  </button>
+  <button class="tab-btn" data-tab="secrets" onclick="switchTab('secrets')">
+    Secrets <span class="badge" id="badge-secrets">—</span>
+  </button>
+</nav>
+
+<main>
+  <div id="loading" class="state-msg">
+    <div class="icon"><span class="spinning">⟳</span></div>
+    <div>Loading stack data…</div>
+  </div>
+
+  <div id="error-box" class="state-msg" style="display:none">
+    <div class="icon">⚠</div>
+    <div id="error-text" style="max-width:520px"></div>
+  </div>
+
+  <!-- Outputs -->
+  <div class="tab-panel active" id="panel-outputs" style="display:none">
+    <div id="outputs-empty" class="state-msg" style="display:none">
+      <div class="icon">◎</div>
+      <div>No outputs yet.<br>Use <code>ctx.Export("key", value)</code> in your config and redeploy.</div>
+    </div>
+    <table class="data-table" id="outputs-table" style="display:none">
+      <thead><tr><th style="width:200px">Key</th><th>Value</th><th style="width:80px"></th></tr></thead>
+      <tbody id="outputs-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Resources -->
+  <div class="tab-panel" id="panel-resources" style="display:none">
+    <div id="resources-empty" class="state-msg" style="display:none">
+      <div class="icon">◎</div>
+      <div>No resources found in the stack state.</div>
+    </div>
+    <table class="data-table" id="resources-table" style="display:none">
+      <thead><tr><th style="width:220px">Type</th><th style="width:200px">Name</th><th>ID</th></tr></thead>
+      <tbody id="resources-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Secrets -->
+  <div class="tab-panel" id="panel-secrets" style="display:none">
+    <div id="secrets-empty" class="state-msg" style="display:none">
+      <div class="icon">◎</div>
+      <div>No secrets found.<br>Use <code>forge secret set NAME value</code> to add one.</div>
+    </div>
+    <table class="data-table" id="secrets-table" style="display:none">
+      <thead><tr><th style="width:240px">Name</th><th>SSM Path</th></tr></thead>
+      <tbody id="secrets-body"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  let currentTab = 'outputs';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab));
+    ['outputs', 'resources', 'secrets'].forEach(t => {
+      const p = document.getElementById('panel-' + t);
+      p.classList.toggle('active', t === tab);
+      p.style.display = (t === tab) ? 'block' : 'none';
+    });
+  }
+
+  function isURL(v) {
+    return typeof v === 'string' && (v.startsWith('http://') || v.startsWith('https://'));
+  }
+
+  async function copyText(btn, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = '✓ Copied';
+      btn.classList.add('copied');
+    } catch {
+      btn.textContent = 'Failed';
+    }
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  }
+
+  async function loadData() {
+    const btn = document.getElementById('refresh-btn');
+    const icon = document.getElementById('refresh-icon');
+    btn.disabled = true;
+    icon.textContent = '⟳';
+    icon.classList.add('spinning');
+
+    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('error-box').style.display = 'none';
+    ['outputs', 'resources', 'secrets'].forEach(t =>
+      document.getElementById('panel-' + t).style.display = 'none');
+
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) throw new Error(await res.text());
+      const d = await res.json();
+
+      const app = d.app || '', stage = d.stage || '';
+      document.getElementById('hdr-app').textContent = app;
+      document.getElementById('hdr-stage').textContent = stage;
+      document.getElementById('stage-pill').classList.add('visible');
+
+      // ── Outputs ────────────────────────────────────────────────────────────
+      const outputs = d.outputs || [];
+      document.getElementById('badge-outputs').textContent = outputs.length;
+      const ob = document.getElementById('outputs-body');
+      ob.innerHTML = '';
+      outputs.forEach(o => {
+        const tr = document.createElement('tr');
+        let valHTML = o.secret
+          ? '<em class="muted">•••••• (secret)</em>'
+          : isURL(o.value)
+            ? `<a href="${o.value}" target="_blank" rel="noopener">${o.value}</a>`
+            : `<span>${o.value}</span>`;
+        tr.innerHTML = `
+          <td class="mono">${o.key}</td>
+          <td class="value-cell">${valHTML}</td>
+          <td style="text-align:right">${o.secret ? '' : '<button class="copy-btn">Copy</button>'}</td>`;
+        ob.appendChild(tr);
+        if (!o.secret) {
+          tr.querySelector('.copy-btn').onclick = function() { copyText(this, o.value); };
+        }
+      });
+      document.getElementById('outputs-empty').style.display = outputs.length === 0 ? 'flex' : 'none';
+      document.getElementById('outputs-table').style.display = outputs.length > 0 ? 'table' : 'none';
+
+      // ── Resources ──────────────────────────────────────────────────────────
+      const resources = (d.resources || []).filter(r => !r.type.startsWith('pulumi:'));
+      document.getElementById('badge-resources').textContent = resources.length;
+      const rb = document.getElementById('resources-body');
+      rb.innerHTML = '';
+      resources.forEach(r => {
+        const tr = document.createElement('tr');
+        // Shorten type: "aws:lambda/function:Function" → "Lambda/Function"
+        const shortType = r.type.includes(':') ? r.type.split(':').pop() : r.type;
+        tr.innerHTML = `
+          <td><span class="type-badge">${shortType}</span></td>
+          <td class="mono">${r.name}</td>
+          <td class="value-cell">${r.id || '<span class="muted">—</span>'}</td>`;
+        rb.appendChild(tr);
+      });
+      document.getElementById('resources-empty').style.display = resources.length === 0 ? 'flex' : 'none';
+      document.getElementById('resources-table').style.display = resources.length > 0 ? 'table' : 'none';
+
+      // ── Secrets ────────────────────────────────────────────────────────────
+      const secs = d.secrets || [];
+      document.getElementById('badge-secrets').textContent = secs.length;
+      const sb = document.getElementById('secrets-body');
+      sb.innerHTML = '';
+      secs.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="secret-badge">${s.name}</span></td>
+          <td class="value-cell">/forge/${app}/${stage}/${s.name}</td>`;
+        sb.appendChild(tr);
+      });
+      document.getElementById('secrets-empty').style.display = secs.length === 0 ? 'flex' : 'none';
+      document.getElementById('secrets-table').style.display = secs.length > 0 ? 'table' : 'none';
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('panel-' + currentTab).style.display = 'block';
+
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error-text').textContent = String(err);
+      document.getElementById('error-box').style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      icon.classList.remove('spinning');
+      icon.textContent = '↺';
+    }
+  }
+
+  switchTab('outputs');
+  loadData();
+</script>
+</body>
+</html>

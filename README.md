@@ -152,6 +152,7 @@ forge secret remove <NAME>            Delete a secret
 forge secret list                     List all secrets for stage
 forge migrate [sst.config.ts]         Convert TS config to Go
 forge bootstrap [--stage <stage>]     Create the Pulumi state S3 bucket
+forge console   [--stage <stage>]     Open the web console (outputs, resources, secrets)
 ```
 
 ### Global flags
@@ -282,10 +283,10 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
-- [ ] Full godoc documentation
-- [ ] Fargate / ECS construct
-- [ ] GitHub Actions CI integration guide
-- [ ] Web console (`forge console`)
+- [x] Full godoc documentation
+- [x] Fargate / ECS construct (`NewService`)
+- [x] GitHub Actions CI integration guide
+- [x] Web console (`forge console`)
 
 ---
 

@@ -242,7 +242,10 @@ github.com/sst-go/forge/
 │   ├── deploy.go                deploy / remove / diff subcommands
 │   ├── dev.go                   dev subcommand
 │   ├── secret.go                secret set/get/remove/list subcommands
-│   └── migrate.go               migrate subcommand
+│   ├── migrate.go               migrate subcommand
+│   ├── console.go               console subcommand — local HTTP server + data API
+│   └── consoleassets/
+│       └── index.html           embedded single-page console UI
 │
 └── examples/
     └── sst.config.go            Reference example (todo API app)
