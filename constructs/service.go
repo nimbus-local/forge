@@ -362,4 +362,3 @@ func buildContainerDefs(ctx *forge.RunContext, name string, args *ServiceArgs, l
 		return string(b), err
 	}).(pulumi.StringOutput)
 }
-
