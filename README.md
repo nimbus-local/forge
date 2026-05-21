@@ -21,6 +21,8 @@ Powered by [Pulumi](https://pulumi.com) under the hood — **state files are ful
 | Project scaffolding | — | ✓ `forge create` |
 | Migration tool | — | ✓ `forge migrate` |
 | Cloudflare Workers / KV / D1 / R2 | ✓ | ✓ |
+| Static site (S3 + CloudFront) | ✓ | ✓ |
+| Next.js (SSR + static) | ✓ | ✓ |
 | Node.js required | ✓ | ✗ |
 
 ---
@@ -180,6 +182,8 @@ their identifiers as environment variables.
 | `NewQueue` | SQS queue + optional consumer | `SST_QUEUE_<NAME>_URL`, `SST_QUEUE_<NAME>_ARN` |
 | `NewTopic` | SNS topic + subscribers | `SST_TOPIC_<NAME>_ARN` |
 | `NewSecret` | SSM SecureString at deploy time | `SST_SECRET_<NAME>` |
+| `NewStaticSite` | S3 + CloudFront static website | `SST_SITE_<NAME>_URL` |
+| `NewNextjsSite` | Next.js on S3 + CloudFront + Lambda | `SST_SITE_<NAME>_URL` |
 
 ### Cloudflare
 
@@ -279,7 +283,6 @@ don't carry Pulumi as a dependency.
 ## Roadmap
 
 - [ ] Full godoc documentation
-- [ ] `NextjsSite` / `StaticSite` constructs
 - [ ] Fargate / ECS construct
 - [ ] GitHub Actions CI integration guide
 - [ ] Web console (`forge console`)

@@ -544,6 +544,8 @@ Pending:
 | `new sst.aws.Queue("X", {...})` | `constructs.NewQueue(ctx, "X", &constructs.QueueArgs{...})` |
 | `new sst.aws.Topic("X", {...})` | `constructs.NewTopic(ctx, "X", &constructs.TopicArgs{...})` |
 | `new sst.Secret("X")` | `constructs.NewSecret(ctx, "X", nil)` |
+| `new sst.aws.StaticSite("X", {...})` | `constructs.NewStaticSite(ctx, "X", &constructs.StaticSiteArgs{...})` |
+| `new sst.aws.NextjsSite("X", {...})` | `constructs.NewNextjsSite(ctx, "X", &constructs.NextjsSiteArgs{...})` |
 | `new sst.cloudflare.Worker("X", {...})` | `cf.NewWorker(ctx, "X", &cf.WorkerArgs{...})` |
 | `new sst.cloudflare.KV("X")` | `cf.NewKVNamespace(ctx, "X", nil)` |
 | `new sst.cloudflare.D1("X")` | `cf.NewD1Database(ctx, "X", nil)` |
