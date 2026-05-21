@@ -13,12 +13,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
+// ssmAPI is the subset of *ssm.Client used by Manager, extracted for testing.
+type ssmAPI interface {
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+	GetParametersByPath(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error)
+}
+
 // Manager handles secret CRUD operations against SSM Parameter Store.
 // Secrets are stored at /forge/<app>/<stage>/<name> as SecureString parameters.
 type Manager struct {
-	client    *ssm.Client
-	appName   string
-	stage     string
+	client  ssmAPI
+	appName string
+	stage   string
 }
 
 // New creates a Manager using the default AWS credential chain.
@@ -36,11 +44,12 @@ func New(appName, stage, awsProfile, awsRegion string) (*Manager, error) {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
 
-	return &Manager{
-		client:  ssm.NewFromConfig(cfg),
-		appName: appName,
-		stage:   stage,
-	}, nil
+	return newWithClient(ssm.NewFromConfig(cfg), appName, stage), nil
+}
+
+// newWithClient constructs a Manager with an injected client — used in tests.
+func newWithClient(client ssmAPI, appName, stage string) *Manager {
+	return &Manager{client: client, appName: appName, stage: stage}
 }
 
 // Set stores or overwrites a secret value.

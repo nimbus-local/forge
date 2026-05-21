@@ -25,6 +25,16 @@ func BucketName(appName, stage string) string {
 	return fmt.Sprintf("%s-%s-forge-state", appName, stage)
 }
 
+// s3API is the subset of *s3.Client used by bootstrap, extracted for testing.
+type s3API interface {
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+	CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
+	PutPublicAccessBlock(ctx context.Context, params *s3.PutPublicAccessBlockInput, optFns ...func(*s3.Options)) (*s3.PutPublicAccessBlockOutput, error)
+	PutBucketVersioning(ctx context.Context, params *s3.PutBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.PutBucketVersioningOutput, error)
+	PutBucketEncryption(ctx context.Context, params *s3.PutBucketEncryptionInput, optFns ...func(*s3.Options)) (*s3.PutBucketEncryptionOutput, error)
+	PutBucketLifecycleConfiguration(ctx context.Context, params *s3.PutBucketLifecycleConfigurationInput, optFns ...func(*s3.Options)) (*s3.PutBucketLifecycleConfigurationOutput, error)
+}
+
 // EnsureStateBucket creates the Pulumi state S3 bucket if it does not already exist.
 // Returns true if the bucket was created, false if it already existed.
 // Safe to call multiple times — idempotent.
@@ -33,9 +43,11 @@ func EnsureStateBucket(ctx context.Context, cfg Config) (created bool, err error
 	if err != nil {
 		return false, err
 	}
+	return ensureWithClient(ctx, client, BucketName(cfg.AppName, cfg.Stage), region)
+}
 
-	name := BucketName(cfg.AppName, cfg.Stage)
-
+// ensureWithClient is the testable core of EnsureStateBucket.
+func ensureWithClient(ctx context.Context, client s3API, name, region string) (bool, error) {
 	exists, err := bucketExists(ctx, client, name)
 	if err != nil {
 		return false, err
@@ -43,14 +55,12 @@ func EnsureStateBucket(ctx context.Context, cfg Config) (created bool, err error
 	if exists {
 		return false, nil
 	}
-
 	if err := createBucket(ctx, client, name, region); err != nil {
 		return false, err
 	}
 	if err := applyBucketSettings(ctx, client, name); err != nil {
 		return false, fmt.Errorf("configure bucket %s: %w", name, err)
 	}
-
 	return true, nil
 }
 
@@ -75,7 +85,7 @@ func newClient(ctx context.Context, cfg Config) (*s3.Client, string, error) {
 	return s3.NewFromConfig(awsCfg), region, nil
 }
 
-func bucketExists(ctx context.Context, client *s3.Client, name string) (bool, error) {
+func bucketExists(ctx context.Context, client s3API, name string) (bool, error) {
 	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(name)})
 	if err == nil {
 		return true, nil
@@ -93,7 +103,7 @@ func bucketExists(ctx context.Context, client *s3.Client, name string) (bool, er
 	return false, fmt.Errorf("head bucket %s: %w", name, err)
 }
 
-func createBucket(ctx context.Context, client *s3.Client, name, region string) error {
+func createBucket(ctx context.Context, client s3API, name, region string) error {
 	input := &s3.CreateBucketInput{Bucket: aws.String(name)}
 	// us-east-1 does not accept a LocationConstraint.
 	if region != "us-east-1" {
@@ -109,7 +119,7 @@ func createBucket(ctx context.Context, client *s3.Client, name, region string) e
 
 // applyBucketSettings configures the state bucket with the settings required
 // for safe, cost-efficient Pulumi state storage.
-func applyBucketSettings(ctx context.Context, client *s3.Client, name string) error {
+func applyBucketSettings(ctx context.Context, client s3API, name string) error {
 	// Block all public access.
 	if _, err := client.PutPublicAccessBlock(ctx, &s3.PutPublicAccessBlockInput{
 		Bucket: aws.String(name),
