@@ -90,6 +90,16 @@ forge diff   # should show zero changes if the config was migrated correctly
 
 ---
 
+## Examples
+
+| Example | Description |
+|---|---|
+| [`examples/checklist-simple`](examples/checklist-simple) | Next.js + DynamoDB, anonymous cookie-keyed lists |
+| [`examples/checklist-full`](examples/checklist-full) | Next.js + Go Lambda + DynamoDB + GitHub OAuth |
+| [`examples/sst.config.go`](examples/sst.config.go) | Reference todo API (DynamoDB + Lambda + S3 + API Gateway) |
+
+---
+
 ## Writing a config from scratch
 
 Create `infra/sst.config.go`:

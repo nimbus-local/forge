@@ -42,6 +42,10 @@ type FunctionArgs struct {
 	URL bool
 	// Description is an optional human-readable description.
 	Description string
+	// Code is the path to a pre-built zip file containing the Lambda deployment package.
+	// For Go: build with GOARCH=arm64 GOOS=linux go build -o bootstrap, then zip the binary.
+	// If empty, the Lambda is registered without code — deploy code separately (e.g. via CI).
+	Code string
 }
 
 // NewFunction creates a Lambda function construct.
@@ -131,6 +135,9 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 
 	if args.Description != "" {
 		fnArgs.Description = pulumi.String(args.Description)
+	}
+	if args.Code != "" {
+		fnArgs.Code = pulumi.NewFileArchive(args.Code)
 	}
 
 	fn, err := awslambda.NewFunction(pctx, name, fnArgs)
