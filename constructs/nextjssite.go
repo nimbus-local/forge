@@ -99,7 +99,7 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	serverFnDir := filepath.Join(openNextDir, "server-function")
 
 	pctx := ctx.Pulumi()
-	const s3OriginID     = "s3-assets"
+	const s3OriginID = "s3-assets"
 	const lambdaOriginID = "lambda-server"
 
 	// ── Private S3 bucket for static assets ──────────────────────────────────
@@ -233,10 +233,10 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 				OriginId:   pulumi.String(lambdaOriginID),
 				DomainName: lambdaDomain,
 				CustomOriginConfig: &cloudfront.DistributionOriginCustomOriginConfigArgs{
-					HttpsPort:             pulumi.Int(443),
-					HttpPort:              pulumi.Int(80),
-					OriginProtocolPolicy:  pulumi.String("https-only"),
-					OriginSslProtocols:    pulumi.StringArray{pulumi.String("TLSv1.2")},
+					HttpsPort:            pulumi.Int(443),
+					HttpPort:             pulumi.Int(80),
+					OriginProtocolPolicy: pulumi.String("https-only"),
+					OriginSslProtocols:   pulumi.StringArray{pulumi.String("TLSv1.2")},
 				},
 			},
 		},
