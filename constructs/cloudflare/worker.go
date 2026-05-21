@@ -154,6 +154,7 @@ func (w *Worker) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_WORKER_%s_NAME", envKey(w.name)): w.resource.Name,
 	}
 }
+
 // LinkName implements forge.Linkable.
 func (w *Worker) LinkName() string { return w.name }
 

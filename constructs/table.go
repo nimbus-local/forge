@@ -153,5 +153,6 @@ func (d *DynamoDB) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_TABLE_%s_ARN", key):  d.resource.Arn,
 	}
 }
+
 // LinkName implements Linkable.
 func (d *DynamoDB) LinkName() string { return d.name }
