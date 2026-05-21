@@ -141,13 +141,13 @@ func (a *ApiGatewayV2) URL() pulumi.StringOutput {
 	return a.stage.InvokeUrl
 }
 
-// linkEnv implements Linkable.
-func (a *ApiGatewayV2) linkEnv() pulumi.StringMap {
+// LinkEnv implements Linkable.
+func (a *ApiGatewayV2) LinkEnv() pulumi.StringMap {
 	return pulumi.StringMap{
 		fmt.Sprintf("SST_API_%s_URL", envKey(a.name)): a.stage.InvokeUrl,
 	}
 }
-func (a *ApiGatewayV2) linkName() string { return a.name }
+func (a *ApiGatewayV2) LinkName() string { return a.name }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

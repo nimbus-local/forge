@@ -91,12 +91,12 @@ func (b *Bucket) Name() pulumi.StringOutput { return b.resource.Bucket }
 // ARN returns the bucket ARN as a Pulumi output.
 func (b *Bucket) ARN() pulumi.StringOutput { return b.resource.Arn }
 
-// linkEnv implements Linkable — injects bucket name and ARN into linked Lambdas.
-func (b *Bucket) linkEnv() pulumi.StringMap {
+// LinkEnv implements Linkable — injects bucket name and ARN into linked Lambdas.
+func (b *Bucket) LinkEnv() pulumi.StringMap {
 	key := envKey(b.name)
 	return pulumi.StringMap{
 		fmt.Sprintf("SST_BUCKET_%s_NAME", key): b.resource.Bucket,
 		fmt.Sprintf("SST_BUCKET_%s_ARN", key):  b.resource.Arn,
 	}
 }
-func (b *Bucket) linkName() string { return b.name }
+func (b *Bucket) LinkName() string { return b.name }
