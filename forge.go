@@ -29,9 +29,19 @@ type Config struct {
 
 // AppConfig holds project-level metadata.
 type AppConfig struct {
-	Name    string
-	Home    string        // "aws" (only supported value for now)
-	Removal RemovalPolicy // default: RemovalDestroy
+	Name       string
+	Home       string              // "aws" | "cloudflare" | "aws+cloudflare"
+	Removal    RemovalPolicy       // default: RemovalDestroy
+	Cloudflare *CloudflareConfig
+}
+
+// CloudflareConfig holds Cloudflare account settings used by CF constructs.
+// Fields default to the corresponding CLOUDFLARE_* environment variables.
+type CloudflareConfig struct {
+	// AccountID is the Cloudflare account ID. Defaults to CLOUDFLARE_ACCOUNT_ID.
+	AccountID string
+	// ZoneID is the Cloudflare zone ID used for custom Worker domains. Defaults to CLOUDFLARE_ZONE_ID.
+	ZoneID string
 }
 
 // RemovalPolicy controls what happens to resources when a stage is torn down.
@@ -224,9 +234,20 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		return fmt.Errorf("stack init: %w", err)
 	}
 
-	// Ensure the AWS plugin is available.
-	if err := stack.Workspace().InstallPlugin(ctx, "aws", "v6.0.0"); err != nil {
-		return fmt.Errorf("install aws plugin: %w", err)
+	// Install cloud provider plugins based on Home.
+	home := cfg.App.Home
+	if home == "" || home == "aws" || home == "aws+cloudflare" {
+		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v6.0.0"); err != nil {
+			return fmt.Errorf("install aws plugin: %w", err)
+		}
+	}
+	if home == "cloudflare" || home == "aws+cloudflare" {
+		if err := validateCFCredentials(); err != nil {
+			return err
+		}
+		if err := stack.Workspace().InstallPlugin(ctx, "cloudflare", "v5.0.0"); err != nil {
+			return fmt.Errorf("install cloudflare plugin: %w", err)
+		}
 	}
 
 	switch action {
@@ -283,6 +304,17 @@ func must(err error) {
 func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
+}
+
+// validateCFCredentials returns an error if no Cloudflare authentication env vars are set.
+func validateCFCredentials() error {
+	if os.Getenv("CLOUDFLARE_API_TOKEN") != "" {
+		return nil
+	}
+	if os.Getenv("CLOUDFLARE_API_KEY") != "" && os.Getenv("CLOUDFLARE_EMAIL") != "" {
+		return nil
+	}
+	return fmt.Errorf("forge: Cloudflare credentials missing — set CLOUDFLARE_API_TOKEN (preferred) or both CLOUDFLARE_API_KEY and CLOUDFLARE_EMAIL")
 }
 
 func stageCfgTags(s *StageConfig) map[string]string {
