@@ -25,6 +25,7 @@ fn := constructs.NewFunction(ctx, "MyFunction", &constructs.FunctionArgs{
 | `Link` | `[]forge.Linkable` | nil | Constructs whose identifiers are injected as env vars |
 | `URL` | `bool` | `false` | Expose a public Lambda Function URL (no API Gateway required) |
 | `Description` | `string` | `""` | Human-readable description shown in the AWS console |
+| `Code` | `string` | `""` | Path to a pre-built zip file containing the deployment package. When empty, the Lambda is registered without code — useful for CI/CD pipelines that push code separately. |
 
 ---
 
@@ -61,18 +62,29 @@ _, err := iam.NewRolePolicy(ctx.Pulumi(), "extra-policy", &iam.RolePolicyArgs{
 
 ## Compiling Go handlers
 
-Lambda expects a compiled binary named `bootstrap` for the `provided.al2023` runtime. Build script:
+Lambda expects a compiled binary named `bootstrap` for the `provided.al2023` runtime. Build and pass the zip path via `Code`:
 
 ```bash
-GOOS=linux GOARCH=arm64 go build -o bootstrap ./functions/api
-zip api.zip bootstrap
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bootstrap ./functions/api
+zip api.zip bootstrap && rm bootstrap
 ```
 
-Or use a `Makefile`:
+```go
+fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
+    Handler: "bootstrap",
+    Code:    "../functions/api.zip",
+})
+```
+
+Or automate with a `Makefile`:
 
 ```makefile
 build:
-	GOOS=linux GOARCH=arm64 go build -o bin/bootstrap ./functions/api
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bootstrap ./functions/api
+	zip -j functions/api.zip bootstrap && rm bootstrap
+
+deploy: build
+	cd infra && forge deploy
 ```
 
 ---

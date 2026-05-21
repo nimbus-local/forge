@@ -58,6 +58,15 @@ forge is a Go-native drop-in replacement for SST (Serverless Stack). It replaces
 
 ---
 
+## Examples
+
+| Example | Description |
+|---|---|
+| [checklist-simple](../examples/checklist-simple) | Next.js + DynamoDB — anonymous cookie-keyed lists, no auth |
+| [checklist-full](../examples/checklist-full) | Next.js + Go Lambda + DynamoDB + GitHub OAuth via Auth.js |
+
+---
+
 ## Quick links
 
 - [GitHub](https://github.com/sst-go/forge)

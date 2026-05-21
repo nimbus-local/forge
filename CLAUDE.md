@@ -221,7 +221,7 @@ github.com/sst-go/forge/
 │
 ├── constructs/
 │   ├── helpers.go               qualifiedName(), defaultTags(), envKey(), panicOnErr()
-│   ├── function.go              NewFunction() — Lambda + IAM role + log group + env injection
+│   ├── function.go              NewFunction() — Lambda + IAM role + log group + env injection + optional Code zip
 │   ├── api.go                   NewApiGatewayV2() — HTTP API with route() helper
 │   ├── table.go                 NewDynamoDB() — table + GSI support
 │   ├── bucket.go                NewBucket() — S3 + CORS + public access block
@@ -248,7 +248,15 @@ github.com/sst-go/forge/
 │       └── index.html           embedded single-page console UI
 │
 └── examples/
-    └── sst.config.go            Reference example (todo API app)
+    ├── sst.config.go            Reference example (todo API app)
+    ├── checklist-simple/        Next.js + DynamoDB — anonymous cookie-keyed lists
+    │   ├── web/                 Next.js 14 App Router (TypeScript)
+    │   └── infra/               forge infra config
+    └── checklist-full/          Next.js + Go Lambda + DynamoDB + GitHub OAuth
+        ├── functions/api/       Go Lambda handler (CRUD)
+        ├── web/                 Next.js 14 + Auth.js (GitHub OAuth)
+        ├── infra/               forge infra config
+        └── Makefile             build + deploy helpers
 ```
 
 ---
