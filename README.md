@@ -185,6 +185,7 @@ their identifiers as environment variables.
 | `NewSecret` | SSM SecureString at deploy time | `SST_SECRET_<NAME>` |
 | `NewStaticSite` | S3 + CloudFront static website | `SST_SITE_<NAME>_URL` |
 | `NewNextjsSite` | Next.js on S3 + CloudFront + Lambda | `SST_SITE_<NAME>_URL` |
+| `NewService` | ECS Fargate service + optional ALB | `SST_SERVICE_<NAME>_URL` |
 
 ### Cloudflare
 
@@ -283,9 +284,18 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
-- [x] Full godoc documentation
+- [x] Bootstrap command + S3 state bucket auto-creation
+- [x] Multi-stage config with per-stage AWS profile, region, tags, and protected stages
+- [x] AWS constructs — Cron, Queue, Topic, Secret
+- [x] Unit tests, integration helpers, e2e stubs
+- [x] Cloudflare support — Worker, KV, D1, R2
+- [x] Project templates — `forge create` with go-api, go-crud, go-worker, fullstack
+- [x] Full godoc + docs site
+- [x] Deploy / destroy / diff summary tables
+- [x] Dev tunnel stub binary (`forge-stub`)
+- [x] Static site (`NewStaticSite`) and Next.js site (`NewNextjsSite`)
 - [x] Fargate / ECS construct (`NewService`)
-- [x] GitHub Actions CI integration guide
+- [x] GitHub Actions CI/CD integration guide
 - [x] Web console (`forge console`)
 
 ---
