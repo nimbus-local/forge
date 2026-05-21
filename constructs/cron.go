@@ -3,10 +3,10 @@ package constructs
 import (
 	"fmt"
 
-	forge "github.com/sst-go/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/scheduler"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // CronArgs configures a scheduled Lambda invocation via EventBridge Scheduler.

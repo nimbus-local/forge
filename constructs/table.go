@@ -3,9 +3,9 @@ package constructs
 import (
 	"fmt"
 
-	forge "github.com/sst-go/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/dynamodb"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // FieldType maps to DynamoDB attribute types.
@@ -82,12 +82,12 @@ func NewDynamoDB(ctx *forge.RunContext, name string, args *DynamoDBArgs) *Dynamo
 	}
 
 	tableArgs := &dynamodb.TableArgs{
-		Name:           pulumi.String(qualifiedName(ctx, name)),
-		BillingMode:    pulumi.String(args.BillingMode),
-		Attributes:     attrs,
-		HashKey:        pulumi.String(args.PrimaryIndex.HashKey),
+		Name:                      pulumi.String(qualifiedName(ctx, name)),
+		BillingMode:               pulumi.String(args.BillingMode),
+		Attributes:                attrs,
+		HashKey:                   pulumi.String(args.PrimaryIndex.HashKey),
 		DeletionProtectionEnabled: pulumi.Bool(args.DeletionProtection),
-		Tags:           defaultTags(ctx, name),
+		Tags:                      defaultTags(ctx, name),
 	}
 
 	if args.PrimaryIndex.RangeKey != "" {

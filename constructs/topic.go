@@ -3,10 +3,10 @@ package constructs
 import (
 	"fmt"
 
-	forge "github.com/sst-go/forge"
 	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/sns"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // TopicArgs configures an SNS topic construct.

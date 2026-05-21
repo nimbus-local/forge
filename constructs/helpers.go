@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode"
 
-	forge "github.com/sst-go/forge"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // qualifiedName returns "<appName>-<stage>-<name>" so resources are namespaced

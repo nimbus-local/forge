@@ -179,16 +179,16 @@ func (m *migrator) convertRunBody(body string) string {
 
 // constructMap maps SST TS construct names to Go constructor names.
 var constructMap = map[string]string{
-	"sst.aws.Function":       "constructs.NewFunction",
-	"sst.aws.ApiGatewayV2":   "constructs.NewApiGatewayV2",
-	"sst.aws.ApiGatewayV1":   "constructs.NewApiGatewayV2", // upgrade
-	"sst.aws.DynamoDB":       "constructs.NewDynamoDB",
-	"sst.aws.Bucket":         "constructs.NewBucket",
-	"sst.aws.Cron":           "constructs.NewCron",
-	"sst.aws.Queue":          "constructs.NewQueue",
-	"sst.aws.Topic":          "constructs.NewTopic",
-	"sst.aws.StaticSite":     "constructs.NewStaticSite",
-	"sst.aws.NextjsSite":     "constructs.NewNextjsSite",
+	"sst.aws.Function":     "constructs.NewFunction",
+	"sst.aws.ApiGatewayV2": "constructs.NewApiGatewayV2",
+	"sst.aws.ApiGatewayV1": "constructs.NewApiGatewayV2", // upgrade
+	"sst.aws.DynamoDB":     "constructs.NewDynamoDB",
+	"sst.aws.Bucket":       "constructs.NewBucket",
+	"sst.aws.Cron":         "constructs.NewCron",
+	"sst.aws.Queue":        "constructs.NewQueue",
+	"sst.aws.Topic":        "constructs.NewTopic",
+	"sst.aws.StaticSite":   "constructs.NewStaticSite",
+	"sst.aws.NextjsSite":   "constructs.NewNextjsSite",
 }
 
 // constructArgsMap maps SST construct names to their Go args struct.

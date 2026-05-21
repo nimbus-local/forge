@@ -192,8 +192,8 @@ func TestEnsureWithClient_HTTP403IsRealError(t *testing.T) {
 // used in the bucketExists fallback.
 type httpStatusError struct{ code int }
 
-func (e *httpStatusError) Error() string        { return fmt.Sprintf("http %d", e.code) }
-func (e *httpStatusError) HTTPStatusCode() int  { return e.code }
+func (e *httpStatusError) Error() string       { return fmt.Sprintf("http %d", e.code) }
+func (e *httpStatusError) HTTPStatusCode() int { return e.code }
 
 // ── createCaptureMock ─────────────────────────────────────────────────────────
 

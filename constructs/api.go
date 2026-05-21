@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	forge "github.com/sst-go/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/apigatewayv2"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // ApiGatewayV2 creates an AWS HTTP API (API Gateway v2) with routes backed by

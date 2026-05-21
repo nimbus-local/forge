@@ -85,9 +85,9 @@ func findConfig() (string, error) {
 	}
 
 	return "", fmt.Errorf(
-		"no sst.config.go found.\n\n" +
-			"  Run %s to convert your existing sst.config.ts, or\n" +
-			"  create %s manually.\n\n" +
+		"no sst.config.go found.\n\n"+
+			"  Run %s to convert your existing sst.config.ts, or\n"+
+			"  create %s manually.\n\n"+
 			"  See: https://github.com/sst-go/forge/blob/main/examples/sst.config.go",
 		bold.Render("forge migrate"),
 		bold.Render("infra/sst.config.go"),

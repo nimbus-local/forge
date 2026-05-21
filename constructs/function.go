@@ -3,11 +3,11 @@ package constructs
 import (
 	"fmt"
 
-	forge "github.com/sst-go/forge"
-	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
+	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
+	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
 )
 
 // Function creates an AWS Lambda function with sane defaults:
@@ -110,13 +110,13 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	}
 
 	fnArgs := &awslambda.FunctionArgs{
-		Name:         pulumi.String(qualifiedName(ctx, name)),
-		Role:         role.Arn,
-		Handler:      pulumi.String(args.Handler),
-		Runtime:      pulumi.String(args.Runtime),
+		Name:          pulumi.String(qualifiedName(ctx, name)),
+		Role:          role.Arn,
+		Handler:       pulumi.String(args.Handler),
+		Runtime:       pulumi.String(args.Runtime),
 		Architectures: pulumi.StringArray{pulumi.String(args.Architecture)},
-		Timeout:      pulumi.Int(args.Timeout),
-		MemorySize:   pulumi.Int(args.MemorySize),
+		Timeout:       pulumi.Int(args.Timeout),
+		MemorySize:    pulumi.Int(args.MemorySize),
 		TracingConfig: &awslambda.FunctionTracingConfigArgs{
 			Mode: pulumi.String(tracingMode),
 		},
@@ -139,7 +139,7 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	// ── Optional Function URL ─────────────────────────────────────────────────
 	if args.URL {
 		_, err = awslambda.NewFunctionUrl(pctx, name+"-url", &awslambda.FunctionUrlArgs{
-			FunctionName:  fn.Name,
+			FunctionName:      fn.Name,
 			AuthorizationType: pulumi.String("NONE"),
 			Cors: &awslambda.FunctionUrlCorsArgs{
 				AllowOrigins: pulumi.StringArray{pulumi.String("*")},
