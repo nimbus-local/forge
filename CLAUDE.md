@@ -224,7 +224,8 @@ github.com/sst-go/forge/
 │   ├── function.go              NewFunction() — Lambda + IAM role + log group + env injection
 │   ├── api.go                   NewApiGatewayV2() — HTTP API with route() helper
 │   ├── table.go                 NewDynamoDB() — table + GSI support
-│   └── bucket.go                NewBucket() — S3 + CORS + public access block
+│   ├── bucket.go                NewBucket() — S3 + CORS + public access block
+│   └── service.go               NewService() — ECS Fargate + ALB
 │
 ├── secrets/
 │   └── manager.go               SSM Parameter Store CRUD (Set/Get/Remove/List/LoadAll)
@@ -546,6 +547,7 @@ Pending:
 | `new sst.Secret("X")` | `constructs.NewSecret(ctx, "X", nil)` |
 | `new sst.aws.StaticSite("X", {...})` | `constructs.NewStaticSite(ctx, "X", &constructs.StaticSiteArgs{...})` |
 | `new sst.aws.NextjsSite("X", {...})` | `constructs.NewNextjsSite(ctx, "X", &constructs.NextjsSiteArgs{...})` |
+| `new sst.aws.Service("X", {...})` | `constructs.NewService(ctx, "X", &constructs.ServiceArgs{...})` |
 | `new sst.cloudflare.Worker("X", {...})` | `cf.NewWorker(ctx, "X", &cf.WorkerArgs{...})` |
 | `new sst.cloudflare.KV("X")` | `cf.NewKVNamespace(ctx, "X", nil)` |
 | `new sst.cloudflare.D1("X")` | `cf.NewD1Database(ctx, "X", nil)` |
