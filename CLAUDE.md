@@ -106,14 +106,14 @@ Done — resources deployed, outputs printed
 Every construct implements the `Linkable` interface:
 
 ```go
-// In forge.go (unexported methods — only constructors inside this module can implement it)
+// In forge.go — only constructs provided by this module are intended to implement this.
 type Linkable interface {
-    linkEnv() pulumi.StringMap   // env vars to inject into linked Functions
-    linkName() string            // construct name for debugging
+    LinkEnv() pulumi.StringMap   // env vars to inject into linked Functions
+    LinkName() string            // construct name for debugging
 }
 ```
 
-When a Function is created with `Link: []forge.Linkable{table, bucket}`, it merges the `linkEnv()` output of each linked resource into its Lambda environment.
+When a Function is created with `Link: []forge.Linkable{table, bucket}`, it merges the `LinkEnv()` output of each linked resource into its Lambda environment.
 
 **Env var key convention** (matches SST exactly so handler code is portable):
 ```
@@ -263,8 +263,8 @@ Constructs use `panicOnErr()` (not returning errors). This is intentional — Pu
 ### Linkable implementation
 Every construct that can be linked must implement both unexported methods:
 ```go
-func (x *MyConstruct) linkEnv() pulumi.StringMap { ... }
-func (x *MyConstruct) linkName() string           { return x.name }
+func (x *MyConstruct) LinkEnv() pulumi.StringMap  { ... }
+func (x *MyConstruct) LinkName() string           { return x.name }
 ```
 
 ### Imports
@@ -291,7 +291,7 @@ These are working and correct — do not refactor unless a feature explicitly re
 
 - The two-module pattern (`infra/` separation)
 - The `FORGE_MODE` / `FORGE_STAGE` env var dispatch mechanism in `forge.go`
-- The `Linkable` interface (unexported methods are intentional)
+- The `Linkable` interface (`LinkEnv`/`LinkName` are exported; only forge constructs should implement it)
 - The `qualifiedName()` and `envKey()` naming helpers
 - The SQS-based dev tunnel architecture (do implement the missing stub binary)
 - The SSM path convention (`/forge/<app>/<stage>/<name>`)
@@ -389,7 +389,7 @@ type QueueArgs struct {
     DeadLetterQueue   bool  // creates DLQ with 3 max receive count
 }
 func NewQueue(ctx *forge.RunContext, name string, args *QueueArgs) *Queue
-// linkEnv: SST_QUEUE_<NAME>_URL, SST_QUEUE_<NAME>_ARN
+// LinkEnv: SST_QUEUE_<NAME>_URL, SST_QUEUE_<NAME>_ARN
 ```
 
 #### `constructs/topic.go` — SNS Topic
@@ -399,13 +399,13 @@ type TopicArgs struct {
     FIFO        bool
 }
 func NewTopic(ctx *forge.RunContext, name string, args *TopicArgs) *Topic
-// linkEnv: SST_TOPIC_<NAME>_ARN
+// LinkEnv: SST_TOPIC_<NAME>_ARN
 ```
 
 #### `constructs/secret.go` — Managed Secret Reference
 ```go
 // Secret fetches an SSM SecureString at deploy time and injects it into linked Lambdas.
-// linkEnv: SST_SECRET_<NAME> = <resolved value>
+// LinkEnv: SST_SECRET_<NAME> = <resolved value>
 type SecretArgs struct {
     Default string   // WARNING: stored in Pulumi state — non-sensitive defaults only
 }

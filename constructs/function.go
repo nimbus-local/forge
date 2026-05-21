@@ -95,7 +95,7 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	}
 	// Inject linked resources' env vars (URLs, ARNs, table names, etc.)
 	for _, link := range args.Link {
-		for k, v := range link.(interface{ linkEnv() pulumi.StringMap }).linkEnv() {
+		for k, v := range link.LinkEnv() {
 			envVars[k] = v
 		}
 	}
@@ -158,10 +158,10 @@ func (f *Function) ARN() pulumi.StringOutput { return f.resource.Arn }
 // Name returns the physical function name as a Pulumi output.
 func (f *Function) Name() pulumi.StringOutput { return f.resource.Name }
 
-// linkEnv implements Linkable — exposes the function ARN to other constructs.
-func (f *Function) linkEnv() pulumi.StringMap {
+// LinkEnv implements Linkable — exposes the function ARN to other constructs.
+func (f *Function) LinkEnv() pulumi.StringMap {
 	return pulumi.StringMap{
 		fmt.Sprintf("SST_FUNCTION_%s_ARN", envKey(f.name)): f.resource.Arn,
 	}
 }
-func (f *Function) linkName() string { return f.name }
+func (f *Function) LinkName() string { return f.name }

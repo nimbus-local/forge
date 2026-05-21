@@ -12,6 +12,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optpreview"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -67,9 +69,10 @@ func (r *RunContext) Export(name string, value interface{}) {
 
 // Linkable is implemented by any construct that can be linked to a Function
 // (injecting its ARNs / URLs as environment variables at deploy time).
+// Only constructs provided by this module are intended to implement this interface.
 type Linkable interface {
-	linkEnv() pulumi.StringMap
-	linkName() string
+	LinkEnv() pulumi.StringMap
+	LinkName() string
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -138,11 +141,11 @@ func runPulumi(cfg *Config, stage, action string) error {
 	// Workspace options — state is stored in an S3 bucket named
 	// <app>-<stage>-forge-state (created automatically on first deploy).
 	workspaceOpts := []auto.LocalWorkspaceOption{
-		auto.Project(auto.Project{
-			Name:    pulumi.String(cfg.App.Name),
-			Runtime: auto.NewProjectRuntimeInfo("go", nil),
-			Backend: &auto.ProjectBackend{
-				URL: pulumi.String(stateBackendURL(cfg.App.Name, stage)),
+		auto.Project(workspace.Project{
+			Name:    tokens.PackageName(cfg.App.Name),
+			Runtime: workspace.NewProjectRuntimeInfo("go", nil),
+			Backend: &workspace.ProjectBackend{
+				URL: stateBackendURL(cfg.App.Name, stage),
 			},
 		}),
 		auto.EnvVars(map[string]string{

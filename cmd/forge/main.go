@@ -57,6 +57,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagRegion, "region", "", "AWS region (overrides profile / env)")
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", "", "Path to sst.config.go (default: ./infra/sst.config.go or ./sst.config.go)")
 
+	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(diffCmd)

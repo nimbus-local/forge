@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/sst-go/forge/internal/bootstrap"
 )
 
 // ── forge deploy ───────────────────────────────────────────────────────────────
@@ -21,6 +23,10 @@ are updated.`,
 		stage := resolveStage()
 		fmt.Printf("\n%s Deploying to %s\n\n", green.Render("▶"), bold.Render(stage))
 		start := time.Now()
+
+		if err := ensureBootstrapped(stage); err != nil {
+			return err
+		}
 
 		if err := runConfig("deploy", stage); err != nil {
 			return err
@@ -65,6 +71,27 @@ and destroy everything including retained resources.`,
 
 func init() {
 	removeCmd.Flags().Bool("force", false, "Destroy retained resources too")
+}
+
+// ensureBootstrapped silently creates the state bucket if it doesn't exist yet.
+// Prints a one-line notice only when the bucket is newly created.
+func ensureBootstrapped(stage string) error {
+	created, err := bootstrap.EnsureStateBucket(context.Background(), bootstrap.Config{
+		AppName:    appNameFromConfig(),
+		Stage:      stage,
+		AWSProfile: flagProfile,
+		AWSRegion:  flagRegion,
+	})
+	if err != nil {
+		return fmt.Errorf("bootstrap state bucket: %w", err)
+	}
+	if created {
+		fmt.Printf("%s  Created state bucket %s\n\n",
+			green.Render("✓"),
+			dim.Render(bootstrap.BucketName(appNameFromConfig(), stage)),
+		)
+	}
+	return nil
 }
 
 // ── forge diff ─────────────────────────────────────────────────────────────────

@@ -145,12 +145,12 @@ func (d *DynamoDB) ARN() pulumi.StringOutput { return d.resource.Arn }
 // StreamARN returns the DynamoDB Stream ARN (empty if streams not enabled).
 func (d *DynamoDB) StreamARN() pulumi.StringOutput { return d.resource.StreamArn }
 
-// linkEnv implements Linkable — injects the table name and ARN into linked Lambdas.
-func (d *DynamoDB) linkEnv() pulumi.StringMap {
+// LinkEnv implements Linkable — injects the table name and ARN into linked Lambdas.
+func (d *DynamoDB) LinkEnv() pulumi.StringMap {
 	key := envKey(d.name)
 	return pulumi.StringMap{
 		fmt.Sprintf("SST_TABLE_%s_NAME", key): d.resource.Name,
 		fmt.Sprintf("SST_TABLE_%s_ARN", key):  d.resource.Arn,
 	}
 }
-func (d *DynamoDB) linkName() string { return d.name }
+func (d *DynamoDB) LinkName() string { return d.name }
