@@ -5,6 +5,7 @@ package secrets
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,7 +45,13 @@ func New(appName, stage, awsProfile, awsRegion string) (*Manager, error) {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
 
-	return newWithClient(ssm.NewFromConfig(cfg), appName, stage), nil
+	var clientOpts []func(*ssm.Options)
+	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
+		clientOpts = append(clientOpts, func(o *ssm.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+		})
+	}
+	return newWithClient(ssm.NewFromConfig(cfg, clientOpts...), appName, stage), nil
 }
 
 // newWithClient constructs a Manager with an injected client — used in tests.

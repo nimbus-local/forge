@@ -177,6 +177,27 @@ func TestEnsureWithClient_HTTP404CountsAsMissing(t *testing.T) {
 	}
 }
 
+func TestNewClient_EndpointWiring(t *testing.T) {
+	// Verifies that newClient() applies FORGE_AWS_ENDPOINT to the S3 client and
+	// enables path-style addressing. We only check construction — the endpoint is
+	// exercised on the first real API call.
+	t.Setenv("FORGE_AWS_ENDPOINT", "http://localhost:19566")
+	client, region, err := newClient(context.Background(), Config{
+		AppName:   "app",
+		Stage:     "test",
+		AWSRegion: "us-east-1",
+	})
+	if err != nil {
+		t.Fatalf("newClient with FORGE_AWS_ENDPOINT set: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected non-nil S3 client")
+	}
+	if region == "" {
+		t.Error("expected non-empty region")
+	}
+}
+
 func TestEnsureWithClient_HTTP403IsRealError(t *testing.T) {
 	t.Parallel()
 	mock := newMockS3()

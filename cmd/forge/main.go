@@ -41,15 +41,33 @@ Powered by Pulumi under the hood — state files are fully compatible with SST v
   forge migrate          Convert sst.config.ts → sst.config.go
 
 %s
-  FORGE_STATE_BUCKET     S3 bucket for Pulumi state (default: <app>-<stage>-forge-state)
+  FORGE_STATE_BUCKET        S3 bucket for Pulumi state (default: <app>-<stage>-forge-state)
   PULUMI_CONFIG_PASSPHRASE  Passphrase for state encryption (default: empty)
-  AWS_PROFILE / AWS_REGION  Standard AWS credential chain vars`,
+  AWS_PROFILE / AWS_REGION  Standard AWS credential chain vars
+  FORGE_AWS_ENDPOINT        Redirect all AWS API calls to a local emulator, e.g. http://localhost:4566`,
 		bold.Render("forge"),
 		bold.Render("Commands:"),
 		bold.Render("Environment variables:"),
 	),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		endpoint := os.Getenv("FORGE_AWS_ENDPOINT")
+		if endpoint == "" {
+			return nil
+		}
+		// Map to the standard AWS SDK env var so all SDK clients and the Pulumi
+		// provider pick it up automatically, including the child `go run .` process.
+		os.Setenv("AWS_ENDPOINT_URL", endpoint)
+		// S3 path-style is required when talking to a local endpoint on localhost.
+		os.Setenv("AWS_S3_USE_PATH_STYLE", "true")
+		// Inject dummy credentials if none are configured — local emulators accept any value.
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+			os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+		}
+		return nil
+	},
 }
 
 func init() {

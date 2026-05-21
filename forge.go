@@ -216,6 +216,20 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 
 	// Workspace options — state is stored in an S3 bucket named
 	// <app>-<stage>-forge-state (created automatically on first deploy).
+	workspaceEnv := map[string]string{
+		// Passphrase for state encryption.
+		// Users can override via PULUMI_CONFIG_PASSPHRASE env var.
+		"PULUMI_CONFIG_PASSPHRASE": envOrDefault("PULUMI_CONFIG_PASSPHRASE", ""),
+	}
+	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
+		workspaceEnv["AWS_ENDPOINT_URL"] = endpoint
+		workspaceEnv["AWS_S3_USE_PATH_STYLE"] = "true"
+		// Inject dummy credentials if none are configured — local emulators accept any value.
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+			workspaceEnv["AWS_ACCESS_KEY_ID"] = "test"
+			workspaceEnv["AWS_SECRET_ACCESS_KEY"] = "test"
+		}
+	}
 	workspaceOpts := []auto.LocalWorkspaceOption{
 		auto.Project(workspace.Project{
 			Name:    tokens.PackageName(cfg.App.Name),
@@ -224,11 +238,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 				URL: stateBackendURL(cfg.App.Name, stage),
 			},
 		}),
-		auto.EnvVars(map[string]string{
-			// Passphrase for state encryption.
-			// Users can override via PULUMI_CONFIG_PASSPHRASE env var.
-			"PULUMI_CONFIG_PASSPHRASE": envOrDefault("PULUMI_CONFIG_PASSPHRASE", ""),
-		}),
+		auto.EnvVars(workspaceEnv),
 	}
 
 	stack, err := auto.UpsertStackInlineSource(ctx, stackName, cfg.App.Name, pulumiProg, workspaceOpts...)

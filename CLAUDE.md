@@ -593,6 +593,7 @@ Pending:
 | `FORGE_APP` | user (optional) | secret.go CLI | App name for secret paths |
 | `FORGE_STATE_BUCKET` | user (optional) | forge.go | Override S3 state bucket |
 | `FORGE_FORCE_REMOVE` | CLI --force flag | forge.Run() | Bypass protected stage check |
+| `FORGE_AWS_ENDPOINT` | user (optional) | all AWS SDK clients, Pulumi provider | Redirect all AWS API calls to a local emulator (e.g. Nimbus at `http://localhost:4566`) |
 | `PULUMI_CONFIG_PASSPHRASE` | user | Pulumi auto | State file encryption |
 | `AWS_PROFILE` | StageConfig / user | AWS SDK | Credential profile |
 | `AWS_DEFAULT_REGION` | StageConfig / user | AWS SDK | Target region |
