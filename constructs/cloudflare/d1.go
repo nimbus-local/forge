@@ -45,4 +45,5 @@ func (d *D1Database) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_D1_%s_NAME", key): d.resource.Name,
 	}
 }
+// LinkName implements forge.Linkable.
 func (d *D1Database) LinkName() string { return d.name }

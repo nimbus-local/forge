@@ -168,4 +168,5 @@ func (f *Function) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_FUNCTION_%s_ARN", envKey(f.name)): f.resource.Arn,
 	}
 }
+// LinkName implements Linkable.
 func (f *Function) LinkName() string { return f.name }

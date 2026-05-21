@@ -99,4 +99,5 @@ func (b *Bucket) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_BUCKET_%s_ARN", key):  b.resource.Arn,
 	}
 }
+// LinkName implements Linkable.
 func (b *Bucket) LinkName() string { return b.name }

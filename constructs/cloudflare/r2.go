@@ -54,4 +54,5 @@ func (r *R2Bucket) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_R2_%s_NAME", key): r.resource.Name,
 	}
 }
+// LinkName implements forge.Linkable.
 func (r *R2Bucket) LinkName() string { return r.name }

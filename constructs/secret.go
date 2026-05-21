@@ -63,4 +63,5 @@ func (s *Secret) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_SECRET_%s", key): s.value,
 	}
 }
+// LinkName implements Linkable.
 func (s *Secret) LinkName() string { return s.name }

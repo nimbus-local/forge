@@ -144,4 +144,5 @@ func (q *Queue) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_QUEUE_%s_ARN", key): q.resource.Arn,
 	}
 }
+// LinkName implements Linkable.
 func (q *Queue) LinkName() string { return q.name }

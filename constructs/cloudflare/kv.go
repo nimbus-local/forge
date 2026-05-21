@@ -45,4 +45,5 @@ func (k *KVNamespace) LinkEnv() pulumi.StringMap {
 		fmt.Sprintf("SST_KV_%s_NAME", key): k.resource.Title,
 	}
 }
+// LinkName implements forge.Linkable.
 func (k *KVNamespace) LinkName() string { return k.name }
