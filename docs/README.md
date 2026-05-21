@@ -28,6 +28,7 @@ forge is a Go-native drop-in replacement for SST (Serverless Stack). It replaces
 | [Secret](constructs/secret.md) | SSM SecureString injected into Lambdas at deploy time |
 | [StaticSite](constructs/static-site.md) | S3 + CloudFront static website (Vite, Hugo, Astro, etc.) |
 | [NextjsSite](constructs/nextjs-site.md) | Next.js app on S3 + CloudFront + Lambda (via open-next) |
+| [Service](constructs/service.md) | ECS Fargate service with optional ALB |
 
 ---
 
