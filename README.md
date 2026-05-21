@@ -283,10 +283,19 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
-- [x] Full godoc documentation
+- [x] Bootstrap command + S3 state bucket auto-creation
+- [x] Multi-stage config with per-stage AWS profile, region, tags, and protected stages
+- [x] AWS constructs — Cron, Queue, Topic, Secret
+- [x] Unit tests, integration helpers, e2e stubs
+- [x] Cloudflare support — Worker, KV, D1, R2
+- [x] Project templates — `forge create` with go-api, go-crud, go-worker, fullstack
+- [x] Full godoc + docs site
+- [x] Deploy / destroy / diff summary tables
+- [x] Dev tunnel stub binary (`forge-stub`)
+- [x] Static site (`NewStaticSite`) and Next.js site (`NewNextjsSite`)
 - [x] Fargate / ECS construct (`NewService`)
-- [x] GitHub Actions CI integration guide
-- [ ] Web console (`forge console`)
+- [x] GitHub Actions CI/CD integration guide
+- [x] Web console (`forge console`)
 
 ---
 
