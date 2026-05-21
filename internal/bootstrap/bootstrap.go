@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -82,7 +83,14 @@ func newClient(ctx context.Context, cfg Config) (*s3.Client, string, error) {
 	if region == "" {
 		region = "us-east-1"
 	}
-	return s3.NewFromConfig(awsCfg), region, nil
+	var clientOpts []func(*s3.Options)
+	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
+		clientOpts = append(clientOpts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+			o.UsePathStyle = true // required for path-style URLs on local endpoints
+		})
+	}
+	return s3.NewFromConfig(awsCfg, clientOpts...), region, nil
 }
 
 func bucketExists(ctx context.Context, client s3API, name string) (bool, error) {

@@ -68,8 +68,14 @@ func NewTunnel(requestQueueURL, responseQueueURL string) (*Tunnel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
+	var clientOpts []func(*sqs.Options)
+	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
+		clientOpts = append(clientOpts, func(o *sqs.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+		})
+	}
 	return &Tunnel{
-		sqs:         sqs.NewFromConfig(cfg),
+		sqs:         sqs.NewFromConfig(cfg, clientOpts...),
 		requestURL:  requestQueueURL,
 		responseURL: responseQueueURL,
 		handlers:    map[string]string{},

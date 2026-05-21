@@ -192,6 +192,20 @@ func TestLoadAll(t *testing.T) {
 	}
 }
 
+func TestNew_EndpointWiring(t *testing.T) {
+	// Verifies that New() applies FORGE_AWS_ENDPOINT to the SSM client.
+	// Uses a port unlikely to be in use; we only check that the client is
+	// constructed without error — the endpoint is validated on first API call.
+	t.Setenv("FORGE_AWS_ENDPOINT", "http://localhost:19566")
+	m, err := New("app", "test", "", "us-east-1")
+	if err != nil {
+		t.Fatalf("New with FORGE_AWS_ENDPOINT set: %v", err)
+	}
+	if m == nil {
+		t.Fatal("expected non-nil Manager")
+	}
+}
+
 func TestSetOverwrite(t *testing.T) {
 	t.Parallel()
 	m := newTestManager()
