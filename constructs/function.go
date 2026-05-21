@@ -18,6 +18,7 @@ import (
 type Function struct {
 	name     string
 	resource *awslambda.Function
+	role     *iam.Role
 	ctx      *forge.RunContext
 }
 
@@ -149,11 +150,14 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 		panicOnErr(err, name+": function url")
 	}
 
-	return &Function{name: name, resource: fn, ctx: ctx}
+	return &Function{name: name, resource: fn, role: role, ctx: ctx}
 }
 
 // ARN returns the Lambda function ARN as a Pulumi output.
 func (f *Function) ARN() pulumi.StringOutput { return f.resource.Arn }
+
+// Role returns the IAM execution role, allowing other constructs to attach policies.
+func (f *Function) Role() *iam.Role { return f.role }
 
 // Name returns the physical function name as a Pulumi output.
 func (f *Function) Name() pulumi.StringOutput { return f.resource.Name }
