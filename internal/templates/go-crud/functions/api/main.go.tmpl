@@ -1,0 +1,64 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"os"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+var db *dynamodb.Client
+
+func init() {
+	cfg, _ := config.LoadDefaultConfig(context.Background())
+	db = dynamodb.NewFromConfig(cfg)
+}
+
+func handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	table := os.Getenv("SST_TABLE_{{envKey .TableName}}_NAME")
+
+	switch req.RouteKey {
+	case "GET /items":
+		out, err := db.Scan(ctx, &dynamodb.ScanInput{TableName: &table})
+		if err != nil {
+			return errResponse(err), nil
+		}
+		body, _ := json.Marshal(out.Items)
+		return jsonResponse(http.StatusOK, string(body)), nil
+
+	case "POST /items":
+		var item map[string]types.AttributeValue
+		if err := json.Unmarshal([]byte(req.Body), &item); err != nil {
+			return errResponse(err), nil
+		}
+		_, err := db.PutItem(ctx, &dynamodb.PutItemInput{TableName: &table, Item: item})
+		if err != nil {
+			return errResponse(err), nil
+		}
+		return jsonResponse(http.StatusCreated, `{"ok":true}`), nil
+	}
+
+	return events.APIGatewayV2HTTPResponse{StatusCode: http.StatusNotFound, Body: "not found"}, nil
+}
+
+func jsonResponse(status int, body string) events.APIGatewayV2HTTPResponse {
+	return events.APIGatewayV2HTTPResponse{
+		StatusCode: status,
+		Headers:    map[string]string{"Content-Type": "application/json"},
+		Body:       body,
+	}
+}
+
+func errResponse(err error) events.APIGatewayV2HTTPResponse {
+	return jsonResponse(http.StatusInternalServerError, `{"error":"`+err.Error()+`"}`)
+}
+
+func main() {
+	lambda.Start(handler)
+}

@@ -1,0 +1,6 @@
+name: go-worker
+description: Cloudflare Worker with optional KV storage
+variables:
+  - name: Module
+    description: "Go module path for the infra module (e.g. github.com/you/my-worker)"
+    default: ""

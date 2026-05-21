@@ -1,0 +1,6 @@
+name: fullstack
+description: AWS Lambda API + Cloudflare Worker frontend with shared DynamoDB
+variables:
+  - name: Module
+    description: "Go module path (e.g. github.com/you/my-app)"
+    default: ""

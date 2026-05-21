@@ -1,0 +1,13 @@
+export default {
+  async fetch(request, env) {
+    // Forward API requests to the Lambda backend via the API_URL binding.
+    if (request.url.includes("/api/")) {
+      const apiUrl = env.API_URL + new URL(request.url).pathname.replace("/api", "");
+      return fetch(apiUrl, { method: request.method, body: request.body, headers: request.headers });
+    }
+
+    return new Response("<h1>Hello from {{.Name}}!</h1>", {
+      headers: { "Content-Type": "text/html" },
+    });
+  },
+};

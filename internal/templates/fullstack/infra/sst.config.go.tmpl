@@ -1,0 +1,42 @@
+package main
+
+import (
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	forge "github.com/sst-go/forge"
+	"github.com/sst-go/forge/constructs"
+	cf "github.com/sst-go/forge/constructs/cloudflare"
+)
+
+func main() {
+	forge.Run(&forge.Config{
+		App: &forge.AppConfig{
+			Name: "{{.Name}}",
+			Home: "aws+cloudflare",
+		},
+		Run: func(ctx *forge.RunContext) error {
+			fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
+				Handler: "bootstrap",
+			})
+
+			api := constructs.NewApiGatewayV2(ctx, "Api", nil)
+			api.Route("GET /", &constructs.RouteArgs{Function: fn})
+
+			// Pass the API URL into the worker as a plain-text binding named API_URL.
+			_ = cf.NewWorker(ctx, "Web", &cf.WorkerArgs{
+				Handler: "../worker/index.js",
+				Link: []forge.Linkable{&apiURLLinkable{url: api.URL()}},
+			})
+
+			ctx.Export("apiUrl", api.URL())
+			return nil
+		},
+	})
+}
+
+// apiURLLinkable injects the API Gateway URL into the Worker as API_URL.
+type apiURLLinkable struct{ url pulumi.StringOutput }
+
+func (a *apiURLLinkable) LinkEnv() pulumi.StringMap {
+	return pulumi.StringMap{"API_URL": a.url}
+}
+func (a *apiURLLinkable) LinkName() string { return "Api" }

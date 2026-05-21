@@ -1,0 +1,6 @@
+name: go-api
+description: Simple HTTP API backed by AWS Lambda and API Gateway v2
+variables:
+  - name: Module
+    description: "Go module path (e.g. github.com/you/my-api)"
+    default: ""

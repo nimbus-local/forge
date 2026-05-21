@@ -1,0 +1,9 @@
+name: go-crud
+description: REST CRUD API with AWS Lambda, API Gateway v2, and DynamoDB
+variables:
+  - name: Module
+    description: "Go module path (e.g. github.com/you/my-crud)"
+    default: ""
+  - name: TableName
+    description: "DynamoDB table name"
+    default: "Items"

@@ -1,0 +1,5 @@
+bin/
+*.wasm
+node_modules/
+dist/
+.env

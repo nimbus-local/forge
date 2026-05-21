@@ -32,6 +32,7 @@ A drop-in replacement for SST (Serverless Stack) written in Go.
 Powered by Pulumi under the hood — state files are fully compatible with SST v3 Ion.
 
 %s
+  forge create <name>    Scaffold a new project from a template
   forge deploy           Deploy your app to AWS
   forge dev              Start live Lambda development
   forge diff             Preview infrastructure changes
@@ -58,6 +59,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", "", "Path to sst.config.go (default: ./infra/sst.config.go or ./sst.config.go)")
 
 	rootCmd.AddCommand(bootstrapCmd)
+	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(diffCmd)

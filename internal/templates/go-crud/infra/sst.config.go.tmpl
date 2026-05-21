@@ -1,0 +1,32 @@
+package main
+
+import (
+	forge "github.com/sst-go/forge"
+	"github.com/sst-go/forge/constructs"
+)
+
+func main() {
+	forge.Run(&forge.Config{
+		App: &forge.AppConfig{
+			Name: "{{.Name}}",
+			Home: "aws",
+		},
+		Run: func(ctx *forge.RunContext) error {
+			table := constructs.NewDynamoDB(ctx, "{{.TableName}}", &constructs.DynamoDBArgs{
+				PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+			})
+
+			fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
+				Handler: "bootstrap",
+				Link:    []forge.Linkable{table},
+			})
+
+			api := constructs.NewApiGatewayV2(ctx, "Api", nil)
+			api.Route("GET /items", &constructs.RouteArgs{Function: fn})
+			api.Route("POST /items", &constructs.RouteArgs{Function: fn})
+
+			ctx.Export("url", api.URL())
+			return nil
+		},
+	})
+}

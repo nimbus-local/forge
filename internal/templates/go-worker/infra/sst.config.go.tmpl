@@ -1,0 +1,21 @@
+package main
+
+import (
+	forge "github.com/sst-go/forge"
+	cf "github.com/sst-go/forge/constructs/cloudflare"
+)
+
+func main() {
+	forge.Run(&forge.Config{
+		App: &forge.AppConfig{
+			Name: "{{.Name}}",
+			Home: "cloudflare",
+		},
+		Run: func(ctx *forge.RunContext) error {
+			cf.NewWorker(ctx, "Worker", &cf.WorkerArgs{
+				Handler: "../worker/index.js",
+			})
+			return nil
+		},
+	})
+}
