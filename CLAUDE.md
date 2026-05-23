@@ -617,11 +617,91 @@ Implementation in `cmd/forge/create.go`:
 4. Run `go mod tidy` in each module dir
 5. Print next steps
 
-### 7. Documentation
+### 7. KMS Encryption + Configurable Retention
+
+#### `constructs/kms.go` — KMS Key
+
+A managed KMS key construct that can be attached to any resource requiring encryption at rest.
+
+```go
+type KMSKeyArgs struct {
+    // Description is a human-readable description of the key's purpose.
+    Description string
+    // EnableRotation enables automatic annual key rotation. Defaults to true.
+    EnableRotation bool
+    // DeletionWindowInDays is the waiting period before key deletion (7–30). Defaults to 30.
+    DeletionWindowInDays int
+}
+func NewKMSKey(ctx *forge.RunContext, name string, args *KMSKeyArgs) *KMSKey
+// LinkEnv: SST_KMS_<NAME>_ARN, SST_KMS_<NAME>_ID
+```
+
+Creates: KMS symmetric key with key policy granting the account full access. Rotation enabled by default.
+
+The key ARN is exposed so it can be passed to other constructs via a `KMSKeyArn string` field:
+
+```go
+key := constructs.NewKMSKey(ctx, "DataKey", nil)
+
+// S3 bucket encrypted with the key
+bucket := constructs.NewBucket(ctx, "Uploads", &constructs.BucketArgs{
+    KMSKeyArn: key.ARN(),
+})
+
+// Lambda log group encrypted with the key
+fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
+    KMSKeyArn: key.ARN(),   // encrypts both the function env vars and its log group
+})
+
+// DynamoDB table encrypted with the key
+table := constructs.NewDynamoDB(ctx, "Users", &constructs.DynamoDBArgs{
+    KMSKeyArn: key.ARN(),
+})
+```
+
+#### KMS integration per construct
+
+| Construct | Field | What it encrypts |
+|---|---|---|
+| `NewBucket` | `KMSKeyArn pulumi.StringInput` | S3 server-side encryption (SSE-KMS) |
+| `NewFunction` | `KMSKeyArn pulumi.StringInput` | Lambda env var encryption + CloudWatch log group |
+| `NewNextjsSite` | `KMSKeyArn pulumi.StringInput` | SSR Lambda env vars + log group + assets bucket |
+| `NewDynamoDB` | `KMSKeyArn pulumi.StringInput` | DynamoDB SSE-KMS (replaces default AWS-owned key) |
+| `NewQueue` | `KMSKeyArn pulumi.StringInput` | SQS message encryption |
+| `NewTopic` | `KMSKeyArn pulumi.StringInput` | SNS message encryption |
+| Secrets (SSM) | automatic | SecureString params already use SSM-managed KMS; optionally accept a custom key ARN |
+
+When `KMSKeyArn` is set, the construct must also grant `kms:GenerateDataKey`, `kms:Decrypt`, and `kms:DescribeKey` to whichever IAM principal needs it (Lambda execution role, CloudWatch Logs service, SNS, SQS). Add these grants automatically inside each constructor using `aws.kms.NewGrant` or an inline key policy statement.
+
+#### Configurable CloudWatch log retention
+
+Currently hardcoded to 14 days in `NewFunction` and `NewNextjsSite`. Add `LogRetentionDays int` to both args structs:
+
+```go
+// FunctionArgs and NextjsSiteArgs
+LogRetentionDays int  // 0 = use default (14). Set to -1 to never expire.
+```
+
+Valid values match the CloudWatch API: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653. Any other non-zero value panics with a helpful message listing valid options.
+
+#### Configurable S3 object lifecycle
+
+Add `LifecycleDays int` to `BucketArgs`:
+
+```go
+// BucketArgs
+LifecycleDays int  // 0 = no lifecycle rule. When set, expire current objects after N days.
+```
+
+When `Versioning` is also true, add a noncurrent version expiration rule at `LifecycleDays` as well. This covers the common use case of auto-purging old uploads or log exports without manual AWS console work.
+
+The state bucket in `internal/bootstrap/bootstrap.go` already has a hardcoded 90-day noncurrent version expiration — leave that as-is.
+
+### 8. Documentation
 
 Every exported type, function, method, and constant needs a godoc comment. `docs/` directory with getting-started, migration guide, config reference, per-construct references, and concept guides (stages, linking, secrets, dev-tunnel, state).
 
-### 8. Deploy Output Enhancement
+### 9. Deploy Output Enhancement
 
 Parse `UpResult` and format a clean summary table after deployment showing resource changes (created/updated/deleted) and stack outputs.
 
