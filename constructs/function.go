@@ -87,7 +87,7 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 
 	// ── CloudWatch log group ──────────────────────────────────────────────────
 	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", &cloudwatch.LogGroupArgs{
-		Name:            pulumi.Sprintf("/aws/lambda/%s", name),
+		Name:            pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name)),
 		RetentionInDays: pulumi.Int(14),
 		Tags:            defaultTags(ctx, name),
 	})
