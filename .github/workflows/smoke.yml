@@ -1,0 +1,128 @@
+name: Smoke Tests
+
+on:
+  pull_request:
+
+# All AWS calls go to Nimbus at localhost:4566.
+# AWS_ENDPOINT_URL is the standard SDK v2 override — covers the STS call inside
+# forge.Run() (resolveAccountID) which runs before the Pulumi workspace env is set.
+# FORGE_AWS_ENDPOINT is forge's own override — sets AWS_ENDPOINT_URL + path-style
+# S3 in the Pulumi workspace for the provider plugin.
+env:
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ENDPOINT_URL: http://localhost:4566
+  FORGE_AWS_ENDPOINT: http://localhost:4566
+  PULUMI_CONFIG_PASSPHRASE: ""
+
+jobs:
+  smoke:
+    name: Smoke — deploy against Nimbus
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Cache both the root and the smoke infra module dependencies.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/smoke/go.sum
+            examples/smoke/infra/go.sum
+
+      # Cache the Pulumi AWS provider plugin so the ~100 MB download only happens
+      # when the plugin version in forge.go changes.
+      - name: Cache Pulumi plugins
+        uses: actions/cache@v5
+        with:
+          path: ~/.pulumi/plugins
+          key: pulumi-plugins-aws-v7.30.0
+
+      # ── Nimbus ────────────────────────────────────────────────────────────────
+      # Nimbus proxies DynamoDB requests to the official amazon/dynamodb-local
+      # image on a shared Docker network.
+
+      - name: Start Nimbus
+        run: |
+          docker network create nimbus-net
+
+          docker run -d \
+            --name dynamodb-local \
+            --network nimbus-net \
+            amazon/dynamodb-local:latest \
+            -jar DynamoDBLocal.jar -inMemory -sharedDb
+
+          docker run -d \
+            --name nimbus \
+            --network nimbus-net \
+            -p 4566:4566 \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            -e NIMBUS_DYNAMODB_ENDPOINT=http://dynamodb-local:8000 \
+            ghcr.io/nimbus-local/nimbus:latest
+
+          echo -n "Waiting for Nimbus..."
+          until curl -sf http://localhost:4566/_nimbus/health >/dev/null; do
+            echo -n "."
+            sleep 1
+          done
+          echo " ready"
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+
+      - name: Build forge CLI
+        run: go build -o forge ./cmd/forge
+
+      # Cross-compile for ARM64 Linux (Lambda runtime) and zip.
+      - name: Build smoke Lambda handler
+        working-directory: examples/smoke
+        run: |
+          GOARCH=arm64 GOOS=linux CGO_ENABLED=0 \
+            go build -o bootstrap ./functions/handler
+          zip -j functions/handler.zip bootstrap
+          rm bootstrap
+
+      # ── Seed ──────────────────────────────────────────────────────────────────
+      # NewSecret panics at deploy time if the SSM parameter is missing and no
+      # Default is set. Pre-seed it so deploy succeeds without modifying the example.
+
+      - name: Seed SmokeKey secret in SSM
+        run: |
+          aws ssm put-parameter \
+            --name /forge/forge-smoke/ci/SmokeKey \
+            --value "ci-smoke-secret" \
+            --type SecureString \
+            --overwrite
+
+      # ── Deploy ────────────────────────────────────────────────────────────────
+
+      - name: Deploy smoke stack
+        id: deploy
+        working-directory: examples/smoke
+        run: ../../forge deploy --stage ci
+
+      # ── Assert ────────────────────────────────────────────────────────────────
+
+      - name: Assert every construct created its resources
+        if: steps.deploy.outcome == 'success'
+        run: .github/scripts/smoke-assert.sh
+
+      # ── Cleanup ───────────────────────────────────────────────────────────────
+
+      - name: Remove smoke stack
+        if: always()
+        working-directory: examples/smoke
+        # Partial deploy (or assert failure after successful deploy) can leave
+        # resources behind; continue-on-error prevents a cleanup failure from
+        # masking the real failure above.
+        continue-on-error: true
+        run: ../../forge remove --stage ci
+
+      - name: Stop Nimbus
+        if: always()
+        run: |
+          docker rm -f nimbus dynamodb-local 2>/dev/null || true
+          docker network rm nimbus-net 2>/dev/null || true

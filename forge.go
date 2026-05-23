@@ -296,7 +296,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 	// Install cloud provider plugins based on Home.
 	home := cfg.App.Home
 	if home == "" || home == "aws" || home == "aws+cloudflare" {
-		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v6.83.3"); err != nil {
+		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v7.30.0"); err != nil {
 			return fmt.Errorf("install aws plugin: %w", err)
 		}
 	}
