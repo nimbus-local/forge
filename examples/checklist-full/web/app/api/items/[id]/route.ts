@@ -5,7 +5,7 @@ import { authOptions } from '@/auth'
 const API_URL = (process.env.SST_API_GATEWAY_URL ?? process.env.API_URL ?? '').replace(/\/$/, '')
 const INTERNAL_KEY = process.env.SST_SECRET_INTERNAL_KEY ?? process.env.INTERNAL_API_KEY ?? ''
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 async function proxyRequest(method: string, path: string, userId: string, body?: unknown) {
   return fetch(`${API_URL}${path}`, {
@@ -26,8 +26,9 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { id } = await params
   const body = await req.json()
-  const res = await proxyRequest('PATCH', `/items/${params.id}`, session.user.id, body)
+  const res = await proxyRequest('PATCH', `/items/${id}`, session.user.id, body)
   return NextResponse.json(await res.json(), { status: res.status })
 }
 
@@ -38,6 +39,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const res = await proxyRequest('DELETE', `/items/${params.id}`, session.user.id)
+  const { id } = await params
+  const res = await proxyRequest('DELETE', `/items/${id}`, session.user.id)
   return new NextResponse(null, { status: res.status })
 }
