@@ -33,6 +33,9 @@ Pulumi.*.yaml
 *.pem
 *.key
 
+# Claude Code project settings (user-specific)
+.claude/
+
 # IDE
 .idea/
 .vscode/
