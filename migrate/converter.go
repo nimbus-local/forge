@@ -50,6 +50,11 @@ type migrator struct {
 
 // run is the top-level conversion driver.
 func (m *migrator) run() (*Result, error) {
+	// Source-level scans for patterns that span multiple lines.
+	if strings.Contains(m.src, "url: true") || strings.Contains(m.src, "url:true") {
+		m.warnings = append(m.warnings, "Function url:true has no direct forge equivalent — use NewApiGatewayV2 or add a Lambda Function URL manually")
+	}
+
 	appCfg := m.extractAppConfig()
 	runBody := m.extractRunBody()
 	goRun := m.convertRunBody(runBody)
@@ -113,7 +118,14 @@ func (m *migrator) extractAppConfig() map[string]string {
 	}
 	block := match[1]
 	for _, kv := range kvRe.FindAllStringSubmatch(block, -1) {
-		result[strings.TrimSpace(kv[1])] = strings.TrimSpace(kv[2])
+		// Strip surrounding TS quotes from plain string values (e.g. "aws-api" → aws-api).
+		// Only strip if the value is fully enclosed in double quotes to avoid mangling
+		// ternary expressions like: input?.stage === "production" ? "retain" : "remove"
+		val := strings.TrimSpace(kv[2])
+		if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
+			val = val[1 : len(val)-1]
+		}
+		result[strings.TrimSpace(kv[1])] = val
 	}
 	return result
 }
@@ -124,8 +136,8 @@ func (m *migrator) buildRemovalPolicy(appCfg map[string]string) string {
 	if removal == "" {
 		return ""
 	}
-	// "retain" literal
-	if strings.Contains(removal, `"retain"`) && !strings.Contains(removal, "?") {
+	// "retain" literal — value may have already had quotes stripped
+	if strings.Contains(removal, "retain") && !strings.Contains(removal, "?") {
 		return `Removal: forge.RemovalRetain,` + "\n\t\t\t"
 	}
 	// common ternary: stage === "production" ? "retain" : "remove"
@@ -183,12 +195,14 @@ var constructMap = map[string]string{
 	"sst.aws.ApiGatewayV2": "constructs.NewApiGatewayV2",
 	"sst.aws.ApiGatewayV1": "constructs.NewApiGatewayV2", // upgrade
 	"sst.aws.DynamoDB":     "constructs.NewDynamoDB",
+	"sst.aws.Dynamo":       "constructs.NewDynamoDB", // SST v3 Ion alias
 	"sst.aws.Bucket":       "constructs.NewBucket",
 	"sst.aws.Cron":         "constructs.NewCron",
 	"sst.aws.Queue":        "constructs.NewQueue",
 	"sst.aws.Topic":        "constructs.NewTopic",
 	"sst.aws.StaticSite":   "constructs.NewStaticSite",
 	"sst.aws.NextjsSite":   "constructs.NewNextjsSite",
+	"sst.aws.Nextjs":       "constructs.NewNextjsSite", // SST v3 Ion alias
 }
 
 // constructArgsMap maps SST construct names to their Go args struct.
@@ -196,12 +210,15 @@ var constructArgsMap = map[string]string{
 	"sst.aws.Function":     "constructs.FunctionArgs",
 	"sst.aws.ApiGatewayV2": "constructs.ApiGatewayV2Args",
 	"sst.aws.DynamoDB":     "constructs.DynamoDBArgs",
+	"sst.aws.Dynamo":       "constructs.DynamoDBArgs", // SST v3 Ion alias
 	"sst.aws.Bucket":       "constructs.BucketArgs",
 }
 
-// newConstructRe matches: const varName = new sst.aws.Construct("Name", { ... });
-// We handle single-line and note multi-line constructs in warnings.
+// newConstructRe matches: const varName = new sst.aws.Construct("Name", ...)
 var newConstructRe = regexp.MustCompile(`(?:const|let|var)\s+(\w+)\s*=\s*new\s+(sst\.\w+\.\w+)\s*\(\s*"([^"]+)"`)
+
+// bareConstructRe matches: new sst.aws.Construct("Name", ...) without variable assignment
+var bareConstructRe = regexp.MustCompile(`^\s*new\s+(sst\.\w+\.\w+)\s*\(\s*"([^"]+)"`)
 
 // routeRe matches: api.route("METHOD /path", { handler: "..." })
 var routeRe = regexp.MustCompile(`(\w+)\.route\s*\(\s*"([^"]+)"\s*,\s*\{([^}]*)\}`)
@@ -209,12 +226,15 @@ var routeRe = regexp.MustCompile(`(\w+)\.route\s*\(\s*"([^"]+)"\s*,\s*\{([^}]*)\
 // simpleRouteRe matches: api.route("METHOD /path", fn)
 var simpleRouteRe = regexp.MustCompile(`(\w+)\.route\s*\(\s*"([^"]+)"\s*,\s*(\w+)`)
 
+// subscribeRe matches: resource.subscribe(...)
+var subscribeRe = regexp.MustCompile(`(\w+)\.subscribe\s*\(`)
+
 func (m *migrator) convertLine(line string) string {
 	if line == "" || strings.HasPrefix(line, "//") {
 		return line
 	}
 
-	// ── new sst.aws.X("Name", {...}) ─────────────────────────────────────────
+	// ── new sst.aws.X("Name", {...}) with variable assignment ────────────────
 	if match := newConstructRe.FindStringSubmatch(line); len(match) == 4 {
 		varName, tsType, constructName := match[1], match[2], match[3]
 		goConstructor, ok := constructMap[tsType]
@@ -238,6 +258,26 @@ func (m *migrator) convertLine(line string) string {
 		return fmt.Sprintf(`%s := %s(ctx, %q, nil)`, varName, goConstructor, constructName)
 	}
 
+	// ── new sst.aws.X("Name", {...}) without variable (e.g. void Nextjs) ────
+	if match := bareConstructRe.FindStringSubmatch(line); len(match) == 3 {
+		tsType, constructName := match[1], match[2]
+		goConstructor, ok := constructMap[tsType]
+		if !ok {
+			m.unsup = append(m.unsup, fmt.Sprintf("Unknown construct: %s", tsType))
+			return fmt.Sprintf("// TODO: unsupported construct %s — %s", tsType, line)
+		}
+		m.imports["constructs"] = true
+		inlineArgs := extractInlineArgs(line)
+		argsStr := m.convertArgs(tsType, inlineArgs)
+		goArgs, hasArgs := constructArgsMap[tsType]
+		if hasArgs && argsStr != "" {
+			return fmt.Sprintf(`%s(ctx, %q, &%s{
+				%s
+			})`, goConstructor, constructName, goArgs, argsStr)
+		}
+		return fmt.Sprintf(`%s(ctx, %q, nil)`, goConstructor, constructName)
+	}
+
 	// ── api.route("METHOD /path", { handler: "..." }) ────────────────────────
 	if match := routeRe.FindStringSubmatch(line); len(match) == 4 {
 		apiVar, routeKey, argsBlock := match[1], match[2], match[3]
@@ -256,6 +296,14 @@ func (m *migrator) convertLine(line string) string {
 	if match := simpleRouteRe.FindStringSubmatch(line); len(match) == 4 {
 		apiVar, routeKey, fnVar := match[1], match[2], match[3]
 		return fmt.Sprintf(`%s.Route(%q, &constructs.RouteArgs{Function: %s})`, apiVar, routeKey, fnVar)
+	}
+
+	// ── resource.subscribe(...) ───────────────────────────────────────────────
+	if match := subscribeRe.FindStringSubmatch(line); len(match) == 2 {
+		varName := match[1]
+		m.warnings = append(m.warnings, fmt.Sprintf(
+			"%s.subscribe() has no direct forge equivalent — wire the consumer via the construct's Consumer/Subscriber args field instead", varName))
+		return fmt.Sprintf("// TODO: %s.subscribe() — set Consumer field on the construct args above", varName)
 	}
 
 	// ── Unrecognised line ─────────────────────────────────────────────────────

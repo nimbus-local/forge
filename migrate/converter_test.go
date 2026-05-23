@@ -257,6 +257,131 @@ func TestConvertExports(t *testing.T) {
 	}
 }
 
+// ── Real-world SST Ion testdata ───────────────────────────────────────────────
+
+// TestRealWorldAWSApi exercises the aws-api SST Ion example: Bucket + ApiGatewayV2
+// with multi-line route calls (the common real-world pattern).
+func TestRealWorldAWSApi(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "aws-api.ts"))
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	r := mustConvert(t, string(input))
+
+	assertContains(t, r.GoSource, "package main", "package declaration")
+	assertContains(t, r.GoSource, "constructs.NewBucket", "NewBucket")
+	assertContains(t, r.GoSource, "constructs.NewApiGatewayV2", "NewApiGatewayV2")
+	assertContains(t, r.GoSource, `"aws-api"`, "app name")
+	assertContains(t, r.GoSource, "forge.RemovalRetain", "retain policy")
+
+	// Multi-line routes cannot be auto-converted — they must produce TODO comments.
+	assertContains(t, r.GoSource, "// TODO:", "TODO for multi-line routes")
+
+	// The reference path header must not appear verbatim in Go output.
+	assertNotContains(t, r.GoSource, "<reference path", "TS reference directive")
+}
+
+// TestRealWorldAWSDynamo exercises the aws-dynamo SST Ion example which uses
+// sst.aws.Dynamo (Ion alias for DynamoDB), table.subscribe(), and url:true.
+func TestRealWorldAWSDynamo(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "aws-dynamo.ts"))
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	r := mustConvert(t, string(input))
+
+	// sst.aws.Dynamo (Ion alias) must map to NewDynamoDB, not emit unsupported.
+	assertContains(t, r.GoSource, "constructs.NewDynamoDB", "Dynamo → NewDynamoDB")
+	assertNotContains(t, r.GoSource, "unsupported construct sst.aws.Dynamo", "no unsupported for Dynamo alias")
+
+	// Function is recognised.
+	assertContains(t, r.GoSource, "constructs.NewFunction", "NewFunction")
+
+	// table.subscribe() has no forge equivalent — must produce a TODO.
+	assertContains(t, r.GoSource, "// TODO:", "TODO for subscribe")
+
+	// url:true on Function must produce a warning.
+	hasURLWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "url") && strings.Contains(w, "Function") {
+			hasURLWarn = true
+			break
+		}
+	}
+	if !hasURLWarn {
+		t.Errorf("expected Function url:true warning, got: %v", r.Warnings)
+	}
+
+	// table.subscribe() must produce a warning pointing at Consumer/Subscriber.
+	hasSubscribeWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "subscribe") {
+			hasSubscribeWarn = true
+			break
+		}
+	}
+	if !hasSubscribeWarn {
+		t.Errorf("expected subscribe warning, got: %v", r.Warnings)
+	}
+}
+
+// TestRealWorldAWSQueue exercises the aws-queue SST Ion example: Queue,
+// queue.subscribe(), and a publisher Function with url:true.
+func TestRealWorldAWSQueue(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "aws-queue.ts"))
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	r := mustConvert(t, string(input))
+
+	assertContains(t, r.GoSource, "constructs.NewQueue", "NewQueue")
+	assertContains(t, r.GoSource, "constructs.NewFunction", "NewFunction")
+
+	// queue.subscribe() → TODO comment.
+	assertContains(t, r.GoSource, "// TODO:", "TODO for subscribe")
+
+	hasSubscribeWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "subscribe") {
+			hasSubscribeWarn = true
+			break
+		}
+	}
+	if !hasSubscribeWarn {
+		t.Errorf("expected subscribe warning, got: %v", r.Warnings)
+	}
+}
+
+// TestRealWorldAWSNextjs exercises the aws-nextjs SST Ion example which uses
+// sst.aws.Nextjs (Ion alias for NextjsSite).
+func TestRealWorldAWSNextjs(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "aws-nextjs.ts"))
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+	r := mustConvert(t, string(input))
+
+	// sst.aws.Nextjs (Ion alias) must map to NewNextjsSite, not emit unsupported.
+	assertContains(t, r.GoSource, "constructs.NewNextjsSite", "Nextjs → NewNextjsSite")
+	assertNotContains(t, r.GoSource, "unsupported construct sst.aws.Nextjs", "no unsupported for Nextjs alias")
+
+	// Linked bucket must also be present.
+	assertContains(t, r.GoSource, "constructs.NewBucket", "NewBucket")
+
+	// No unsupported entries at all for this simple config.
+	if len(r.Unsupported) > 0 {
+		t.Errorf("expected no unsupported patterns, got: %v", r.Unsupported)
+	}
+}
+
 // ── TestRoundTrip ─────────────────────────────────────────────────────────────
 
 // TestRoundTrip exercises Convert on a realistic full SST config and verifies
