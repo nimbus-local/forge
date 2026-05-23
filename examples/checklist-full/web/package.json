@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest"
   },
   "dependencies": {
     "next": "^14.2.15",
@@ -14,9 +15,13 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "jest": "^30.4.2",
+    "jest-environment-node": "^30.4.1",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }

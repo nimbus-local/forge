@@ -337,6 +337,112 @@ SigV4 signing to reach the Lambda. Application-level auth (Auth.js, GitHub OAuth
 middleware) still runs inside the Lambda and is unaffected. A Next.js site using GitHub
 OAuth works correctly with `AuthorizationType: NONE`.
 
+### NextjsSite: next-auth integration gotchas
+
+These were discovered building `examples/checklist-full`. Violating any of them produces
+silent or misleading errors (server error pages, NO_SECRET, assets 404ing).
+
+**1. `SessionProvider` must be in a `"use client"` wrapper.**
+
+`SessionProvider` from `next-auth/react` uses React Context. Rendering it directly in a
+Server Component (e.g. `app/layout.tsx`) throws `Error: React Context is unavailable in
+Server Components`. Always extract it:
+
+```tsx
+// app/providers.tsx
+'use client'
+import { SessionProvider } from 'next-auth/react'
+export function Providers({ children, session }) {
+  return <SessionProvider session={session}>{children}</SessionProvider>
+}
+
+// app/layout.tsx  ← Server Component, no 'use client'
+import { Providers } from './providers'
+export default async function RootLayout({ children }) {
+  const session = await getServerSession(authOptions)
+  return <html><body><Providers session={session}>{children}</Providers></body></html>
+}
+```
+
+**2. Never use the bare next-auth middleware re-export.**
+
+```typescript
+// ❌ reads NEXTAUTH_SECRET directly, ignores authOptions, breaks behind CloudFront
+export { default } from 'next-auth/middleware'
+```
+
+The bare re-export reads `process.env.NEXTAUTH_SECRET` at the module level and derives the
+redirect URL from the request `Host` header. Behind CloudFront + Lambda Function URL the
+`Host` header is the Lambda URL, not the CloudFront domain. This causes:
+- `[next-auth][error][NO_SECRET]` if only `SST_SECRET_NEXTAUTH_SECRET` is set
+- Redirects that send the browser to the raw Lambda URL domain
+- Static asset 404s because `/_next/static/*` only exists on CloudFront/S3
+
+Always use a custom middleware with `getToken`:
+
+```typescript
+// ✅ middleware.ts
+import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const token = await getToken({
+    req,
+    secret: process.env.SST_SECRET_NEXTAUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  })
+  if (!token) {
+    const base = process.env.NEXTAUTH_URL ?? req.nextUrl.origin
+    const loginUrl = new URL('/login', base)
+    loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
+    return NextResponse.redirect(loginUrl)
+  }
+  return NextResponse.next()
+}
+```
+
+**3. `NEXTAUTH_URL` must be set as a Lambda env var.**
+
+Without it, next-auth constructs OAuth callback URLs and sign-in form actions using the
+request origin — which is the Lambda Function URL, not CloudFront. The GitHub OAuth callback
+will fail and clicking "Sign in with GitHub" will do nothing (JS chunk 404s before handlers
+attach). Set it in `NextjsSiteArgs.Environment`:
+
+```go
+site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
+    Path: "../web",
+    Environment: map[string]string{
+        "NEXTAUTH_URL": "https://<your-cloudfront-or-custom-domain>",
+    },
+    Link: []forge.Linkable{...},
+})
+```
+
+Update this value when adding a custom domain. This is a temporary workaround — the
+permanent fix (roadmap item 8) adds a CloudFront viewer-request function that copies
+`Host` → `x-forwarded-host` automatically.
+
+**4. `authOptions` must declare `pages.signIn`.**
+
+Without it, next-auth redirects unauthenticated users to its built-in `/api/auth/signin`
+page rather than your custom login page. Add to `authOptions`:
+
+```typescript
+pages: {
+  signIn: '/login',
+},
+```
+
+**5. GitHub OAuth app callback URL.**
+
+The GitHub OAuth app's "Authorization callback URL" must be:
+```
+<NEXTAUTH_URL>/api/auth/callback/github
+```
+e.g. `https://d6ee090je5y94.cloudfront.net/api/auth/callback/github`. If this does not
+match exactly (including scheme and path), GitHub will reject the OAuth redirect and the
+sign-in flow will fail with a redirect_uri_mismatch error.
+
 ---
 
 ## Planned Features
