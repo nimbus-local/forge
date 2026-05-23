@@ -175,7 +175,7 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	fn, err := awslambda.NewFunction(pctx, name+"-server", &awslambda.FunctionArgs{
 		Name:          pulumi.String(qualifiedName(ctx, name+"-server")),
 		Role:          role.Arn,
-		Runtime:       pulumi.String("nodejs20.x"),
+		Runtime:       pulumi.String("nodejs24.x"),
 		Handler:       pulumi.String("index.handler"),
 		Architectures: pulumi.StringArray{pulumi.String("arm64")},
 		MemorySize:    pulumi.Int(args.MemorySize),
