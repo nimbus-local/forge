@@ -2,6 +2,7 @@
 set -e
 
 echo "pre-commit: running go fmt..."
+gofmt -w .
 go fmt ./...
 
 echo "pre-commit: running go vet..."
