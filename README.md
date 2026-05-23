@@ -325,9 +325,9 @@ Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbu
 
 **Test suite**
 
-- [ ] Unit tests — `migrate/`, `secrets/`, `constructs/helpers`, `internal/bootstrap` (70%+ coverage)
-- [ ] Integration test helpers — `MustDeploy` / `MustRemove` wrappers for real AWS stacks
-- [ ] E2E CLI tests — `forge deploy`, `forge diff`, `forge migrate`, `forge secret` against the compiled binary
+- [x] Unit tests — `migrate/`, `secrets/`, `constructs/helpers`, `internal/bootstrap` (70%+ coverage)
+- [x] Integration test helpers — `MustDeploy` / `MustRemove` wrappers for real AWS stacks
+- [x] E2E CLI tests — `forge deploy`, `forge diff`, `forge migrate`, `forge secret` against the compiled binary
 
 **AWS validation**
 
