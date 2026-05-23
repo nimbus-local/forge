@@ -2,6 +2,7 @@ package constructs
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -92,11 +93,16 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	panicOnErr(err, name+": resolve project path")
 
 	// ── Build with open-next ──────────────────────────────────────────────────
+	runShellCmd("npm install", absPath, nil, name+": npm install")
 	runShellCmd("npx --yes open-next@latest build", absPath, args.Environment, name+": open-next build")
 
 	openNextDir := filepath.Join(absPath, ".open-next")
 	assetsDir := filepath.Join(openNextDir, "assets")
-	serverFnDir := filepath.Join(openNextDir, "server-function")
+	// open-next v3 uses server-functions/default; v2 used server-function.
+	serverFnDir := filepath.Join(openNextDir, "server-functions", "default")
+	if _, err := os.Stat(serverFnDir); err != nil {
+		serverFnDir = filepath.Join(openNextDir, "server-function")
+	}
 
 	pctx := ctx.Pulumi()
 	const s3OriginID = "s3-assets"
@@ -104,7 +110,7 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 
 	// ── Private S3 bucket for static assets ──────────────────────────────────
 	bucket, err := s3.NewBucket(pctx, name+"-assets", &s3.BucketArgs{
-		Bucket:       pulumi.String(qualifiedName(ctx, name+"-assets")),
+		Bucket:       pulumi.String(bucketName(ctx, name+"-assets")),
 		ForceDestroy: pulumi.Bool(true),
 		Tags:         defaultTags(ctx, name),
 	})
@@ -182,15 +188,14 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	})
 	panicOnErr(err, name+": lambda function")
 
-	// Lambda Function URL — CloudFront uses this as the SSR origin.
+	// AuthorizationType NONE + two public resource-based policy statements is required for
+	// CloudFront → Lambda Function URL to work. AWS_IAM requires SigV4 signing which
+	// CloudFront does not perform for Lambda URL origins without a full OAC setup that
+	// currently doesn't work reliably. The resource-based policy must grant BOTH
+	// lambda:InvokeFunctionUrl and lambda:InvokeFunction to Principal "*".
 	fnURL, err := awslambda.NewFunctionUrl(pctx, name+"-fn-url", &awslambda.FunctionUrlArgs{
 		FunctionName:      fn.Name,
 		AuthorizationType: pulumi.String("NONE"),
-		Cors: &awslambda.FunctionUrlCorsArgs{
-			AllowOrigins: pulumi.StringArray{pulumi.String("*")},
-			AllowMethods: pulumi.StringArray{pulumi.String("*")},
-			AllowHeaders: pulumi.StringArray{pulumi.String("*")},
-		},
 	})
 	panicOnErr(err, name+": function url")
 
@@ -279,6 +284,22 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 
 	dist, err := cloudfront.NewDistribution(pctx, name+"-cdn", distArgs)
 	panicOnErr(err, name+": cloudfront distribution")
+
+	// Grant public invoke access required for NONE auth type (both actions required).
+	_, err = awslambda.NewPermission(pctx, name+"-fn-url-public", &awslambda.PermissionArgs{
+		Action:              pulumi.String("lambda:InvokeFunctionUrl"),
+		Function:            fn.Name,
+		Principal:           pulumi.String("*"),
+		FunctionUrlAuthType: pulumi.String("NONE"),
+	})
+	panicOnErr(err, name+": lambda function url permission")
+
+	_, err = awslambda.NewPermission(pctx, name+"-fn-invoke-public", &awslambda.PermissionArgs{
+		Action:    pulumi.String("lambda:InvokeFunction"),
+		Function:  fn.Name,
+		Principal: pulumi.String("*"),
+	})
+	panicOnErr(err, name+": lambda invoke permission")
 
 	// ── Bucket policy: allow CloudFront OAC ───────────────────────────────────
 	_, err = s3.NewBucketPolicy(pctx, name+"-assets-policy", &s3.BucketPolicyArgs{

@@ -17,6 +17,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/sst-go/forge/internal/pulumibundle"
 )
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -230,6 +231,11 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 			workspaceEnv["AWS_SECRET_ACCESS_KEY"] = "test"
 		}
 	}
+	pulumiCmd, err := resolvePulumiCommand()
+	if err != nil {
+		return err
+	}
+
 	workspaceOpts := []auto.LocalWorkspaceOption{
 		auto.Project(workspace.Project{
 			Name:    tokens.PackageName(cfg.App.Name),
@@ -239,6 +245,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 			},
 		}),
 		auto.EnvVars(workspaceEnv),
+		auto.Pulumi(pulumiCmd),
 	}
 
 	stack, err := auto.UpsertStackInlineSource(ctx, stackName, cfg.App.Name, pulumiProg, workspaceOpts...)
@@ -249,7 +256,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 	// Install cloud provider plugins based on Home.
 	home := cfg.App.Home
 	if home == "" || home == "aws" || home == "aws+cloudflare" {
-		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v6.0.0"); err != nil {
+		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v6.83.3"); err != nil {
 			return fmt.Errorf("install aws plugin: %w", err)
 		}
 	}
@@ -257,7 +264,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		if err := validateCFCredentials(); err != nil {
 			return err
 		}
-		if err := stack.Workspace().InstallPlugin(ctx, "cloudflare", "v5.0.0"); err != nil {
+		if err := stack.Workspace().InstallPlugin(ctx, "cloudflare", "v5.49.1"); err != nil {
 			return fmt.Errorf("install cloudflare plugin: %w", err)
 		}
 	}
@@ -304,6 +311,20 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// resolvePulumiCommand returns a PulumiCommand using the system-installed
+// Pulumi binary if available, or auto-downloads it to ~/.forge/pulumi/<version>/.
+func resolvePulumiCommand() (auto.PulumiCommand, error) {
+	cmd, err := auto.NewPulumiCommand(nil)
+	if err == nil {
+		return cmd, nil
+	}
+	root, err := pulumibundle.EnsureDir()
+	if err != nil {
+		return nil, err
+	}
+	return auto.NewPulumiCommand(&auto.PulumiCommandOptions{Root: root})
+}
 
 // stateBackendURL returns an S3 URL for Pulumi state storage.
 // The bucket is tagged and created automatically by forge on first deploy.

@@ -15,6 +15,12 @@ func qualifiedName(ctx *forge.RunContext, name string) string {
 	return fmt.Sprintf("%s-%s-%s", ctx.App.Name, ctx.Stage, name)
 }
 
+// bucketName returns a qualified S3 bucket name lowercased to satisfy the
+// S3 naming constraint (only lowercase alphanumeric characters and hyphens).
+func bucketName(ctx *forge.RunContext, name string) string {
+	return strings.ToLower(qualifiedName(ctx, name))
+}
+
 // defaultTags returns the standard set of resource tags used by all constructs,
 // merged with any extra tags defined in the active StageConfig.
 func defaultTags(ctx *forge.RunContext, name string) pulumi.StringMap {

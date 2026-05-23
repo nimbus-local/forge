@@ -1,0 +1,21 @@
+{
+  "env": {
+    "PATH": "/Users/tuan/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "go fmt ./... && go vet ./... && go test ./... -short",
+            "timeout": 120,
+            "statusMessage": "Running fmt / vet / test..."
+          }
+        ]
+      }
+    ]
+  }
+}

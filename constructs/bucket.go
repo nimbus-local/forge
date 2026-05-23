@@ -36,7 +36,7 @@ func NewBucket(ctx *forge.RunContext, name string, args *BucketArgs) *Bucket {
 	pctx := ctx.Pulumi()
 
 	bucketArgs := &s3.BucketArgs{
-		Bucket: pulumi.String(qualifiedName(ctx, name)),
+		Bucket: pulumi.String(bucketName(ctx, name)),
 		Tags:   defaultTags(ctx, name),
 	}
 
