@@ -331,8 +331,8 @@ Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbu
 
 **AWS validation**
 
-- [ ] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
-- [ ] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
+- [x] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
+- [x] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
 - [ ] Dedicated smoke-test app exercising every construct: Function, Queue, Topic, Cron, Service, Secret
 
 **Nimbus parity**
