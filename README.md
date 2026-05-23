@@ -104,6 +104,7 @@ forge diff   # should show zero changes if the config was migrated correctly
 |---|---|
 | [`examples/checklist-simple`](examples/checklist-simple) | Next.js + DynamoDB, anonymous cookie-keyed lists |
 | [`examples/checklist-full`](examples/checklist-full) | Next.js + Go Lambda + DynamoDB + GitHub OAuth |
+| [`examples/smoke`](examples/smoke) | Smoke-test app — exercises every construct (Function, Queue, Topic, Cron, Secret, DynamoDB, Bucket, ApiGatewayV2) |
 | [`examples/sst.config.go`](examples/sst.config.go) | Reference todo API (DynamoDB + Lambda + S3 + API Gateway) |
 
 ---
@@ -333,16 +334,16 @@ Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbu
 
 - [x] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
 - [x] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
-- [ ] Dedicated smoke-test app exercising every construct: Function, Queue, Topic, Cron, Service, Secret
+- [x] Dedicated smoke-test app exercising every construct: Function, Queue, Topic, Cron, Service, Secret
 
 **Nimbus parity**
 
 forge already supports `FORGE_AWS_ENDPOINT` for redirecting Pulumi and all AWS SDK calls to a local emulator.
 This milestone adds structured assertions on top of that.
 
-- [ ] Deploy all example apps to Nimbus — assert resource creation, link env var injection, API routing
+- [ ] Deploy `examples/smoke` against Nimbus — assert every construct creates resources, link env vars are injected, and the API Gateway route responds correctly
 - [ ] Verify `forge dev` tunnel over Nimbus SQS (request/response queues round-trip locally)
-- [ ] CI gate: Nimbus deployment job in GitHub Actions (no AWS account or credentials required)
+- [ ] CI gate: Nimbus deployment job in GitHub Actions that runs the smoke app on every PR (no AWS account or credentials required)
 
 ### Phase 3 — Hardening
 

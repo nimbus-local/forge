@@ -51,8 +51,11 @@ node_modules/
 package-lock.json
 next-env.d.ts
 
-# Compiled binaries (e.g. forge-stub built locally)
+# Compiled binaries (forge CLI, forge-stub, example handler binaries)
 forge-stub
+/forge
+examples/*/handler
+examples/*/infra/*-infra
 
 # Lambda deployment packages
 *.zip

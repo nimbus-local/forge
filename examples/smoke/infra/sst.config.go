@@ -1,0 +1,114 @@
+// Smoke-test stack that exercises every forge construct.
+//
+// Build the handler binary before deploying:
+//
+//	make build
+//
+// Deploy:
+//
+//	make deploy
+//
+// After deploying, hit the API Gateway URL to verify link injection:
+//
+//	curl $(forge diff --stage <stage> | grep url) /
+//
+// Expected response: 200 JSON with all SST_* env vars populated.
+package main
+
+import (
+	forge "github.com/nimbus-local/forge"
+	"github.com/nimbus-local/forge/constructs"
+)
+
+func main() {
+	forge.Run(&forge.Config{
+		App: &forge.AppConfig{
+			Name: "forge-smoke",
+			Home: "aws",
+		},
+		Run: func(ctx *forge.RunContext) error {
+			// ── Storage ───────────────────────────────────────────────────────
+
+			table := constructs.NewDynamoDB(ctx, "Records", &constructs.DynamoDBArgs{
+				Fields: map[string]constructs.FieldType{
+					"pk": constructs.FieldTypeString,
+					"sk": constructs.FieldTypeString,
+				},
+				PrimaryIndex: &constructs.PrimaryIndex{
+					HashKey:  "pk",
+					RangeKey: "sk",
+				},
+			})
+
+			bucket := constructs.NewBucket(ctx, "Assets", nil)
+
+			// ── Secrets ───────────────────────────────────────────────────────
+			// Set before first deploy:
+			//   forge secret set SmokeKey <any-value>
+
+			secret := constructs.NewSecret(ctx, "SmokeKey", nil)
+
+			// ── Handler function args (reused by Queue, Topic, and Cron) ──────
+			// Each construct that receives handlerArgs creates its own Lambda function.
+
+			handlerArgs := &constructs.FunctionArgs{
+				Handler: "bootstrap",
+				Code:    "../functions/handler.zip",
+				Link:    []forge.Linkable{table, bucket, secret},
+			}
+
+			// ── API function ──────────────────────────────────────────────────
+
+			fn := constructs.NewFunction(ctx, "Handler", handlerArgs)
+
+			api := constructs.NewApiGatewayV2(ctx, "Api", nil)
+			api.Route("GET /", &constructs.RouteArgs{Function: fn})
+			api.Route("GET /health", &constructs.RouteArgs{Function: fn})
+
+			// ── Queue with consumer ───────────────────────────────────────────
+
+			queue := constructs.NewQueue(ctx, "Events", &constructs.QueueArgs{
+				Consumer:          handlerArgs,
+				VisibilityTimeout: 30,
+				DeadLetterQueue:   true,
+			})
+
+			// ── Topic with subscriber ─────────────────────────────────────────
+
+			topic := constructs.NewTopic(ctx, "Alerts", &constructs.TopicArgs{
+				Subscribers: []*constructs.FunctionArgs{handlerArgs},
+			})
+
+			// ── Cron job (every 5 minutes) ────────────────────────────────────
+
+			constructs.NewCron(ctx, "Heartbeat", &constructs.CronArgs{
+				Schedule: "rate(5 minutes)",
+				Job:      handlerArgs,
+			})
+
+			// ── Service (ECS Fargate) ─────────────────────────────────────────
+			// Uncomment and fill in your VPC details to exercise NewService.
+			// Requires an existing VPC with at least one subnet.
+			//
+			// constructs.NewService(ctx, "Web", &constructs.ServiceArgs{
+			// 	Image:  "nginx:1.27-alpine",
+			// 	CPU:    256,
+			// 	Memory: 512,
+			// 	Port:   80,
+			// 	VPC: &constructs.ServiceVPCArgs{
+			// 		VPCID:     "vpc-xxxxxxxx",
+			// 		SubnetIDs: []string{"subnet-xxxxxxxx"},
+			// 	},
+			// })
+
+			// ── Outputs ───────────────────────────────────────────────────────
+
+			ctx.Export("apiUrl", api.URL())
+			ctx.Export("queueUrl", queue.URL())
+			ctx.Export("topicArn", topic.ARN())
+			ctx.Export("bucketName", bucket.Name())
+			ctx.Export("tableName", table.TableName())
+			return nil
+		},
+	})
+}
