@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: Create Release
+    name: Build & Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -17,12 +17,17 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Verify build
-        run: go build ./...
+          cache: true
 
       - name: Run tests
         run: go test ./... -short
+
+      - name: Build binaries
+        run: |
+          GOOS=linux  GOARCH=amd64 go build -o forge-linux-amd64  ./cmd/forge
+          GOOS=linux  GOARCH=arm64 go build -o forge-linux-arm64  ./cmd/forge
+          GOOS=darwin GOARCH=amd64 go build -o forge-darwin-amd64 ./cmd/forge
+          GOOS=darwin GOARCH=arm64 go build -o forge-darwin-arm64 ./cmd/forge
 
       - name: Create GitHub release
         env:
@@ -31,4 +36,8 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            --verify-tag
+            --verify-tag \
+            forge-linux-amd64 \
+            forge-linux-arm64 \
+            forge-darwin-amd64 \
+            forge-darwin-arm64
