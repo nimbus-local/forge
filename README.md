@@ -30,6 +30,12 @@ Powered by [Pulumi](https://pulumi.com) under the hood — **state files are ful
 ## Installation
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/nimbus-local/forge/master/install.sh | sh
+```
+
+Or install from source:
+
+```bash
 go install github.com/nimbus-local/forge/cmd/forge@latest
 ```
 
