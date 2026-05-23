@@ -451,6 +451,61 @@ type SecretArgs struct {
 func NewSecret(ctx *forge.RunContext, name string, args *SecretArgs) *Secret
 ```
 
+#### `constructs/cognito.go` — Cognito User Pool
+```go
+type CognitoArgs struct {
+    SelfSignUpEnabled bool
+    // Social identity providers (e.g. "Google", "Facebook", "Apple")
+    IdentityProviders []string
+}
+func NewCognito(ctx *forge.RunContext, name string, args *CognitoArgs) *Cognito
+// LinkEnv: SST_COGNITO_<NAME>_USER_POOL_ID, SST_COGNITO_<NAME>_CLIENT_ID
+```
+Creates: Cognito User Pool + App Client. Useful for teams that need managed
+email/password or social login without a third-party auth service, or that have
+compliance requirements (SOC2, HIPAA) favouring AWS-native identity.
+Pairs well with a `checklist-cognito` example to complement the GitHub OAuth
+`checklist-full` example.
+
+#### `constructs/email.go` — SES Email Identity
+```go
+type EmailArgs struct {
+    // Sender is either a full domain ("acme.com") or a single address ("no-reply@acme.com").
+    // Domain identity: forge creates DKIM + MAIL FROM records and exports them as stack
+    //   outputs — the operator must add them to DNS before SES will send.
+    // Address identity: SES sends a one-click verification email; no DNS work required
+    //   but sending is limited to that single address.
+    Sender string
+    // ReplyTo is injected into every send as the Reply-To header (optional).
+    ReplyTo string
+    // ConfigSet enables a SES Configuration Set for open/click/bounce tracking
+    // via EventBridge or SNS. Requires a separate NewTopic or NewQueue to consume events.
+    ConfigSet bool
+}
+func NewEmail(ctx *forge.RunContext, name string, args *EmailArgs) *Email
+// LinkEnv: SST_EMAIL_<NAME>_SENDER   — verified From address
+//          SST_EMAIL_<NAME>_CONFIG_SET — configuration set name (if ConfigSet: true)
+```
+Creates: SES domain or address identity + optional DKIM signing + optional configuration
+set. When linked to a Function, automatically grants `ses:SendEmail` and
+`ses:SendRawEmail` on the verified identity ARN — the Lambda can send immediately
+without any manual IAM wiring.
+
+DNS records for domain identities are exported as stack outputs so the operator knows
+exactly what to add (DKIM CNAME × 3, MAIL FROM MX + TXT). SES stays in sandbox mode
+until the account is manually moved to production via the AWS console — document this
+prominently.
+
+**Magic link pattern** (application code, not a construct):
+A magic link flow needs `NewEmail` for sending plus application code in a Lambda:
+1. Generate a signed, time-limited token (HMAC-SHA256 + expiry, or a UUID stored in
+   DynamoDB with a TTL attribute).
+2. Send the link via SES using the injected `SST_EMAIL_<NAME>_SENDER`.
+3. On click, a second route validates the token (check DynamoDB TTL or verify HMAC),
+   issues a session cookie, and deletes the token.
+`NewDynamoDB` + `NewEmail` + `NewFunction` + `NewApiGatewayV2` is the complete
+infrastructure for a magic link auth system. No additional construct needed.
+
 ### 4. Tests
 
 #### Unit tests — `migrate/converter_test.go`
@@ -586,6 +641,8 @@ Pending:
 | `new sst.aws.StaticSite("X", {...})` | `constructs.NewStaticSite(ctx, "X", &constructs.StaticSiteArgs{...})` |
 | `new sst.aws.NextjsSite("X", {...})` | `constructs.NewNextjsSite(ctx, "X", &constructs.NextjsSiteArgs{...})` |
 | `new sst.aws.Service("X", {...})` | `constructs.NewService(ctx, "X", &constructs.ServiceArgs{...})` |
+| `new sst.aws.Cognito("X", {...})` | `constructs.NewCognito(ctx, "X", &constructs.CognitoArgs{...})` |
+| `new sst.aws.Email("X", {...})` | `constructs.NewEmail(ctx, "X", &constructs.EmailArgs{...})` |
 | `new sst.cloudflare.Worker("X", {...})` | `cf.NewWorker(ctx, "X", &cf.WorkerArgs{...})` |
 | `new sst.cloudflare.KV("X")` | `cf.NewKVNamespace(ctx, "X", nil)` |
 | `new sst.cloudflare.D1("X")` | `cf.NewD1Database(ctx, "X", nil)` |
