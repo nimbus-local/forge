@@ -855,11 +855,28 @@ host-derivation problem. Custom domains work automatically. This matches what SS
 their `NextjsSite` construct. Update the checklist-full example's `middleware.ts` and remove
 the `NEXTAUTH_URL` env var from its infra config once this is implemented.
 
-### 9. Documentation
+### 9. NextjsSite: Image Optimization Lambda
+
+open-next produces an `image-optimization-function` alongside the SSR Lambda, but
+`NewNextjsSite` currently only deploys the SSR Lambda. Without the image optimization
+function, `/_next/image` requests hit the SSR Lambda and 404, so `next/image` components
+render broken images.
+
+**Fix:**
+1. Deploy `.open-next/image-optimization-function` as a second Lambda (Node.js, arm64).
+2. Add a CloudFront ordered cache behavior for `/_next/image*` pointing at the image
+   optimization Lambda Function URL.
+3. Grant the image Lambda access to the S3 assets bucket for local image optimization.
+
+Until this is implemented, users must set `images: { unoptimized: true }` in
+`next.config.js` to bypass the optimization endpoint. Document this in the construct
+godoc and in `docs/constructs/nextjssite.md`.
+
+### 10. Documentation
 
 Every exported type, function, method, and constant needs a godoc comment. `docs/` directory with getting-started, migration guide, config reference, per-construct references, and concept guides (stages, linking, secrets, dev-tunnel, state).
 
-### 9. Deploy Output Enhancement
+### 11. Deploy Output Enhancement
 
 Parse `UpResult` and format a clean summary table after deployment showing resource changes (created/updated/deleted) and stack outputs.
 
