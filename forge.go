@@ -6,6 +6,7 @@ package forge
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -369,12 +370,20 @@ func resolvePulumiCommand() (auto.PulumiCommand, error) {
 // stateBackendURL returns an S3 URL for Pulumi state storage.
 // The bucket is tagged and created automatically by forge on first deploy.
 // FORGE_STATE_BUCKET overrides the default name entirely.
+//
+// When FORGE_AWS_ENDPOINT is set, the endpoint is embedded as gocloud.dev query
+// parameters. The gocloud.dev S3 driver parses these directly, bypassing AWS SDK
+// environment variable reading (which varies across gocloud.dev versions).
 func stateBackendURL(appName, stage, accountID string) string {
 	bucket := os.Getenv("FORGE_STATE_BUCKET")
-	if bucket != "" {
-		return "s3://" + bucket
+	if bucket == "" {
+		bucket = fmt.Sprintf("%s-%s-forge-state-%s", appName, stage, accountID)
 	}
-	return fmt.Sprintf("s3://%s-%s-forge-state-%s", appName, stage, accountID)
+	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
+		return fmt.Sprintf("s3://%s?endpoint=%s&disableSSL=true&s3ForcePathStyle=true",
+			bucket, url.QueryEscape(endpoint))
+	}
+	return "s3://" + bucket
 }
 
 // resolveAccountID calls STS GetCallerIdentity to obtain the AWS account ID.
