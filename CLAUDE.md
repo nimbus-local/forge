@@ -332,6 +332,11 @@ The resource-based policy must grant **both** `lambda:InvokeFunctionUrl` and
 `lambda:InvokeFunction` to `Principal: "*"`. Granting only one action causes AWS to show
 a console warning and requests will be denied.
 
+`NONE` does not mean the application is unauthenticated. It means AWS does not require
+SigV4 signing to reach the Lambda. Application-level auth (Auth.js, GitHub OAuth, JWT
+middleware) still runs inside the Lambda and is unaffected. A Next.js site using GitHub
+OAuth works correctly with `AuthorizationType: NONE`.
+
 ---
 
 ## Planned Features
