@@ -321,6 +321,17 @@ These are working and correct — do not refactor unless a feature explicitly re
 - Cobra CLI structure in `cmd/forge/`
 - Lipgloss styles defined in `cmd/forge/main.go` — use them everywhere
 
+### NextjsSite: Lambda Function URL auth
+
+`NewNextjsSite` uses `AuthorizationType: NONE` on the Lambda Function URL with two public
+resource-based policy statements. **Do not switch to `AWS_IAM`.** The `AWS_IAM` approach
+requires CloudFront OAC with Lambda signing, which does not work reliably and results in
+403 errors from CloudFront.
+
+The resource-based policy must grant **both** `lambda:InvokeFunctionUrl` and
+`lambda:InvokeFunction` to `Principal: "*"`. Granting only one action causes AWS to show
+a console warning and requests will be denied.
+
 ---
 
 ## Planned Features

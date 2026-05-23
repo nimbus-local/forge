@@ -38,29 +38,30 @@ This is the right trade-off for a getting-started example. For an authenticated 
 
 ---
 
-## Prerequisites
-
-- AWS credentials configured (`aws configure` or `AWS_PROFILE`)
-- Node.js 18+ (the open-next build runs during `forge deploy`)
-- Go 1.22+
-
----
-
 ## Deploy
 
+### Prerequisites
+
+- AWS credentials configured (`aws configure` or `AWS_PROFILE`)
+- Go 1.22+
+- Node.js 18+ (Next.js build toolchain — the SSR Lambda runs on `nodejs20.x`)
+- forge CLI: `go install github.com/sst-go/forge/cmd/forge@latest`
+
+Pulumi is downloaded automatically on first deploy to `~/.forge/pulumi/` — no separate install needed.
+
+### Commands
+
 ```bash
-cd infra
-go mod tidy          # downloads forge + Pulumi dependencies
-forge deploy         # builds Next.js via open-next, deploys to AWS
+make deploy          # bootstrap state bucket + deploy (STAGE=dev by default)
+make deploy STAGE=production
+make remove          # tear down
+make dev             # run Next.js locally
 ```
 
-The deploy output prints the CloudFront URL.
+`make deploy` handles the full sequence: `go mod tidy`, state bucket creation
+(idempotent), and `forge deploy`. The CloudFront URL is printed when it finishes.
 
-To tear down:
-
-```bash
-forge remove
-```
+CloudFront distributions take ~1–2 minutes to become globally active after first deploy.
 
 ---
 

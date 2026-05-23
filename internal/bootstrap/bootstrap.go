@@ -103,10 +103,16 @@ func bucketExists(ctx context.Context, client s3API, name string) (bool, error) 
 	if errors.As(err, &notFound) {
 		return false, nil
 	}
-	// SDK v2 may surface 404s as a generic HTTP response error.
+	// SDK v2 may surface 404s or 301s as generic HTTP response errors.
 	var httpErr interface{ HTTPStatusCode() int }
-	if errors.As(err, &httpErr) && httpErr.HTTPStatusCode() == 404 {
-		return false, nil
+	if errors.As(err, &httpErr) {
+		switch httpErr.HTTPStatusCode() {
+		case 404:
+			return false, nil
+		case 301:
+			// Bucket exists but was created in a different region — treat as exists.
+			return true, nil
+		}
 	}
 	return false, fmt.Errorf("head bucket %s: %w", name, err)
 }

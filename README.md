@@ -23,7 +23,7 @@ Powered by [Pulumi](https://pulumi.com) under the hood — **state files are ful
 | Cloudflare Workers / KV / D1 / R2 | ✓ | ✓ |
 | Static site (S3 + CloudFront) | ✓ | ✓ |
 | Next.js (SSR + static) | ✓ | ✓ |
-| Node.js required | ✓ | ✗ |
+| Node.js required | ✓ | Only for `NewNextjsSite` |
 
 ---
 
@@ -32,6 +32,8 @@ Powered by [Pulumi](https://pulumi.com) under the hood — **state files are ful
 ```bash
 go install github.com/sst-go/forge/cmd/forge@latest
 ```
+
+Pulumi is downloaded automatically on first deploy to `~/.forge/pulumi/` — no separate install needed.
 
 ---
 
@@ -294,10 +296,11 @@ don't carry Pulumi as a dependency.
 
 ## Roadmap
 
+### Phase 1 — Foundation (complete)
+
 - [x] Bootstrap command + S3 state bucket auto-creation
 - [x] Multi-stage config with per-stage AWS profile, region, tags, and protected stages
 - [x] AWS constructs — Cron, Queue, Topic, Secret
-- [x] Unit tests, integration helpers, e2e stubs
 - [x] Cloudflare support — Worker, KV, D1, R2
 - [x] Project templates — `forge create` with go-api, go-crud, go-worker, fullstack
 - [x] Full godoc + docs site
@@ -307,6 +310,39 @@ don't carry Pulumi as a dependency.
 - [x] Fargate / ECS construct (`NewService`)
 - [x] GitHub Actions CI/CD integration guide
 - [x] Web console (`forge console`)
+
+### Phase 2 — Testing & Nimbus validation (current)
+
+The goal of this phase is to confirm forge is a reliable SST replacement before declaring it production-ready.
+Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbus](https://github.com/nimbus-local/nimbus)
+(a LocalStack-compatible AWS emulator) to give every contributor a fast, account-free CI target.
+
+**Test suite**
+
+- [ ] Unit tests — `migrate/`, `secrets/`, `constructs/helpers`, `internal/bootstrap` (70%+ coverage)
+- [ ] Integration test helpers — `MustDeploy` / `MustRemove` wrappers for real AWS stacks
+- [ ] E2E CLI tests — `forge deploy`, `forge diff`, `forge migrate`, `forge secret` against the compiled binary
+
+**AWS validation**
+
+- [ ] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
+- [ ] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
+- [ ] Dedicated smoke-test app exercising every construct: Function, Queue, Topic, Cron, Service, Secret
+
+**Nimbus parity**
+
+forge already supports `FORGE_AWS_ENDPOINT` for redirecting Pulumi and all AWS SDK calls to a local emulator.
+This milestone adds structured assertions on top of that.
+
+- [ ] Deploy all example apps to Nimbus — assert resource creation, link env var injection, API routing
+- [ ] Verify `forge dev` tunnel over Nimbus SQS (request/response queues round-trip locally)
+- [ ] CI gate: Nimbus deployment job in GitHub Actions (no AWS account or credentials required)
+
+### Phase 3 — Hardening
+
+- [ ] Aurora / RDS construct (`NewDatabase`) — RDS Postgres/MySQL + connection string injection
+- [ ] ElastiCache construct (`NewCache`) — Redis/Valkey cluster + connection string injection
+- [ ] Drift detection — `forge drift` compares live AWS state against Pulumi state
 
 ---
 

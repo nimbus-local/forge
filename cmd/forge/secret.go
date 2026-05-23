@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 
 	"github.com/spf13/cobra"
 	"github.com/sst-go/forge/secrets"
@@ -116,42 +118,44 @@ func newSecretManager() (*secrets.Manager, error) {
 	return secrets.New(appName, resolveStage(), flagProfile, flagRegion)
 }
 
-// appNameFromConfig attempts to read the app name from sst.config.go.
-// Falls back to the directory name, then "app".
+// appNameRE matches the Name field inside an AppConfig literal.
+// Handles both single-line and multiline config blocks.
+var appNameRE = regexp.MustCompile(`AppConfig\{[^}]*Name:\s*"([^"]+)"`)
+
+// appNameFromConfig reads the app name from sst.config.go.
+// Search order: FORGE_APP env var → parsed sst.config.go → directory name.
 func appNameFromConfig() string {
 	if name := os.Getenv("FORGE_APP"); name != "" {
 		return name
 	}
+
+	// Locate sst.config.go using the same search order as findConfig().
+	candidates := []string{
+		"sst.config.go",
+		filepath.Join("infra", "sst.config.go"),
+		filepath.Join("..", "sst.config.go"),
+	}
+	if flagConfig != "" {
+		candidates = append([]string{flagConfig}, candidates...)
+	}
+	for _, c := range candidates {
+		data, err := os.ReadFile(c)
+		if err != nil {
+			continue
+		}
+		if m := appNameRE.FindSubmatch(data); len(m) > 1 {
+			return string(m[1])
+		}
+	}
+
+	// Last resort: use the working directory name, skipping "infra".
 	if dir, err := os.Getwd(); err == nil {
-		parts := splitPath(dir)
-		if len(parts) > 0 {
-			return parts[len(parts)-1]
+		if base := filepath.Base(dir); base != "infra" {
+			return base
+		}
+		if parent := filepath.Base(filepath.Dir(dir)); parent != "" && parent != "." {
+			return parent
 		}
 	}
 	return "app"
-}
-
-func splitPath(path string) []string {
-	var parts []string
-	for _, p := range []byte(path) {
-		if p == '/' || p == '\\' {
-			continue
-		}
-	}
-	// Simple split
-	cur := ""
-	for _, c := range path {
-		if c == '/' || c == '\\' {
-			if cur != "" {
-				parts = append(parts, cur)
-				cur = ""
-			}
-		} else {
-			cur += string(c)
-		}
-	}
-	if cur != "" {
-		parts = append(parts, cur)
-	}
-	return parts
 }

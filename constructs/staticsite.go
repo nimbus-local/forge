@@ -105,7 +105,7 @@ func NewStaticSite(ctx *forge.RunContext, name string, args *StaticSiteArgs) *St
 
 	// ── Private S3 bucket ─────────────────────────────────────────────────────
 	bucket, err := s3.NewBucket(pctx, name+"-assets", &s3.BucketArgs{
-		Bucket:       pulumi.String(qualifiedName(ctx, name+"-assets")),
+		Bucket:       pulumi.String(bucketName(ctx, name+"-assets")),
 		ForceDestroy: pulumi.Bool(true),
 		Tags:         defaultTags(ctx, name),
 	})
