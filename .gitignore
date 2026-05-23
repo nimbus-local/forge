@@ -41,3 +41,13 @@ Pulumi.*.yaml
 *.swo~
 *~
 
+# Next.js / Node.js build artifacts
+.next/
+.open-next/
+node_modules/
+package-lock.json
+next-env.d.ts
+
+# Compiled binaries (e.g. forge-stub built locally)
+forge-stub
+
