@@ -4,6 +4,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -60,16 +61,30 @@ func newWithClient(client ssmAPI, appName, stage string) *Manager {
 }
 
 // Set stores or overwrites a secret value.
+// Tags are applied on creation only — SSM rejects Tags+Overwrite in the same call.
 func (m *Manager) Set(ctx context.Context, name, value string) error {
 	_, err := m.client.PutParameter(ctx, &ssm.PutParameterInput{
-		Name:      aws.String(m.path(name)),
-		Value:     aws.String(value),
-		Type:      types.ParameterTypeSecureString,
-		Overwrite: aws.Bool(true),
+		Name:  aws.String(m.path(name)),
+		Value: aws.String(value),
+		Type:  types.ParameterTypeSecureString,
 		Tags: []types.Tag{
 			{Key: aws.String("forge:app"), Value: aws.String(m.appName)},
 			{Key: aws.String("forge:stage"), Value: aws.String(m.stage)},
 		},
+	})
+	if err == nil {
+		return nil
+	}
+	var already *types.ParameterAlreadyExists
+	if !errors.As(err, &already) {
+		return fmt.Errorf("set secret %q: %w", name, err)
+	}
+	// Parameter exists — overwrite value only (tags stay as-is).
+	_, err = m.client.PutParameter(ctx, &ssm.PutParameterInput{
+		Name:      aws.String(m.path(name)),
+		Value:     aws.String(value),
+		Type:      types.ParameterTypeSecureString,
+		Overwrite: aws.Bool(true),
 	})
 	if err != nil {
 		return fmt.Errorf("set secret %q: %w", name, err)

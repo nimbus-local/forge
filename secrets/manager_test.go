@@ -19,7 +19,12 @@ type mockSSM struct {
 func newMockSSM() *mockSSM { return &mockSSM{params: map[string]string{}} }
 
 func (m *mockSSM) PutParameter(_ context.Context, in *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-	m.params[aws.ToString(in.Name)] = aws.ToString(in.Value)
+	name := aws.ToString(in.Name)
+	_, exists := m.params[name]
+	if exists && !aws.ToBool(in.Overwrite) {
+		return nil, &ssm_types.ParameterAlreadyExists{}
+	}
+	m.params[name] = aws.ToString(in.Value)
 	return &ssm.PutParameterOutput{}, nil
 }
 
