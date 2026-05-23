@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.101.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.27
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.0
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.68.6
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.83.3
@@ -79,7 +79,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/iwdgo/sigintwindows v0.2.2 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
