@@ -113,6 +113,23 @@ func (r *RunContext) ExtraTags() map[string]string {
 // Pulumi returns the underlying pulumi.Context for advanced use cases.
 func (r *RunContext) Pulumi() *pulumi.Context { return r.pulumiCtx }
 
+// NewRunContext constructs a RunContext suitable for testing infrastructure programs.
+// Pass the *pulumi.Context received inside a pulumi.RunErr callback that uses pulumi.WithMocks.
+//
+//	err := pulumi.RunErr(func(pctx *pulumi.Context) error {
+//	    ctx := forge.NewRunContext(pctx, &forge.AppConfig{Name: "myapp"}, "test", "123456789012")
+//	    // create constructs and assert on them
+//	    return nil
+//	}, pulumi.WithMocks("myapp", "test", mocks))
+func NewRunContext(pctx *pulumi.Context, app *AppConfig, stage, accountID string) *RunContext {
+	return &RunContext{
+		pulumiCtx: pctx,
+		App:       app,
+		Stage:     stage,
+		AccountID: accountID,
+	}
+}
+
 // Export exposes a stack output visible in `forge deploy` output and the
 // SST Console. value must be a pulumi.Output or a plain string/int.
 func (r *RunContext) Export(name string, value interface{}) {
