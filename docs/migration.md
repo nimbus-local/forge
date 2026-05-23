@@ -125,7 +125,7 @@ func main() {
         },
         Run: func(ctx *forge.RunContext) error {
             table := constructs.NewDynamoDB(ctx, "UsersTable", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "pk"},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "pk"},
             })
 
             fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{

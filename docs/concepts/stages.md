@@ -99,7 +99,7 @@ Run: func(ctx *forge.RunContext) error {
     // Conditional resource based on stage
     if ctx.IsProduction() {
         constructs.NewDynamoDB(ctx, "AuditLog", &constructs.DynamoDBArgs{
-            PrimaryIndex:        constructs.PrimaryIndex{PartitionKey: "id"},
+            PrimaryIndex:        &constructs.PrimaryIndex{HashKey: "id"},
             PointInTimeRecovery: true,
         })
     }

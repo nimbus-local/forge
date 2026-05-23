@@ -109,7 +109,7 @@ Use `WorkerArgs.Link` to inject AWS resource identifiers (ARNs, URLs, names) as 
 ```go
 api   := constructs.NewApiGatewayV2(ctx, "Api", nil)
 table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-    PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+    PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
 })
 
 worker := cf.NewWorker(ctx, "Frontend", &cf.WorkerArgs{
@@ -216,7 +216,7 @@ func main() {
         Run: func(ctx *forge.RunContext) error {
             // AWS backend
             table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
             })
             api := constructs.NewApiGatewayV2(ctx, "Api", nil)
             api.Route("GET /orders", &constructs.RouteArgs{

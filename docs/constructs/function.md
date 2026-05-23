@@ -93,7 +93,8 @@ deploy: build
 
 ```go
 table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-    PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+    Fields:       map[string]constructs.FieldType{"id": constructs.FieldTypeString},
+    PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
 })
 
 fn := constructs.NewFunction(ctx, "OrdersApi", &constructs.FunctionArgs{

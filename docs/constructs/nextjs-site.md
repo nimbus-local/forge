@@ -2,7 +2,7 @@
 
 Deploys a Next.js application to AWS using [open-next](https://open-next.js.org/).
 Static assets are served from S3 via CloudFront; SSR pages and API routes run in
-a Node.js 20 Lambda behind a second CloudFront origin.
+a Node.js 24 Lambda behind a second CloudFront origin.
 
 ```go
 import "github.com/sst-go/forge/constructs"
@@ -76,15 +76,34 @@ iam.NewRolePolicy(ctx.Pulumi(), "web-dynamo-policy", &iam.RolePolicyArgs{
 | Resource | Purpose |
 |---|---|
 | `aws.s3.Bucket` | Static asset storage |
-| `aws.s3.BucketPublicAccessBlock` | Block direct public access |
+| `aws.s3.BucketPublicAccessBlock` | Block direct public access to S3 |
 | `aws.cloudfront.OriginAccessControl` | Secure S3 ↔ CloudFront (sigv4) |
 | `aws.iam.Role` | SSR Lambda execution role |
 | `aws.cloudwatch.LogGroup` | Lambda logs (14-day retention) |
-| `aws.lambda.Function` | Node.js 20 SSR handler |
-| `aws.lambda.FunctionUrl` | HTTPS endpoint for CloudFront |
-| `aws.cloudfront.Distribution` | CDN with two origins |
-| `aws.s3.BucketPolicy` | Allow CloudFront OAC |
+| `aws.lambda.Function` | Node.js 24 SSR handler (arm64) |
+| `aws.lambda.FunctionUrl` | HTTPS endpoint for CloudFront (auth type: NONE) |
+| `aws.lambda.Permission` × 2 | Public invoke access (required for NONE auth) |
+| `aws.cloudfront.Distribution` | CDN with S3 + Lambda origins |
+| `aws.s3.BucketPolicy` | Allow CloudFront OAC to read S3 |
 | `aws.s3.BucketObject` × N | One per file in `.open-next/assets/` |
+
+---
+
+## Lambda Function URL auth
+
+The SSR Lambda uses `AuthorizationType: NONE` on its Function URL. This means AWS does
+not require SigV4 signing to reach the Lambda — it does **not** mean the application is
+unauthenticated. Application-level auth (Auth.js, GitHub OAuth, JWT middleware) runs
+inside the Lambda and is completely unaffected.
+
+Two resource-based policy statements are required for `NONE` auth type:
+- `lambda:InvokeFunctionUrl` → `Principal: "*"`
+- `lambda:InvokeFunction` → `Principal: "*"`
+
+Granting only one causes AWS to show a console warning and requests will be denied.
+
+> **Do not switch to `AWS_IAM`.** CloudFront OAC with Lambda signing does not work
+> reliably and causes 403s from CloudFront.
 
 ---
 
@@ -93,6 +112,7 @@ iam.NewRolePolicy(ctx.Pulumi(), "web-dynamo-policy", &iam.RolePolicyArgs{
 On every `forge deploy` (and `forge diff`), forge runs:
 
 ```bash
+npm install
 npx --yes open-next@latest build
 ```
 
@@ -101,7 +121,8 @@ in the project `Path`. The resulting `.open-next/` directory is then deployed:
 | Output | Deployed to |
 |---|---|
 | `.open-next/assets/` | S3 bucket (static files) |
-| `.open-next/server-function/` | Lambda function (zipped by Pulumi) |
+| `.open-next/server-functions/default/` | Lambda function (open-next v3) |
+| `.open-next/server-function/` | Lambda function (open-next v2 fallback) |
 
 ---
 
@@ -132,13 +153,13 @@ Linked resource env vars (`SST_*`) are injected **only at Lambda runtime** (not 
 
 ```go
 table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-    PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+    Fields:       map[string]constructs.FieldType{"id": constructs.FieldTypeString},
+    PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
 })
 
 site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
     Link: []forge.Linkable{table},
-    // table.LinkEnv() → SST_TABLE_ORDERS_NAME, SST_TABLE_ORDERS_ARN
-    // available in server components and API routes via process.env
+    // SST_TABLE_ORDERS_NAME and SST_TABLE_ORDERS_ARN available via process.env
 })
 ```
 
@@ -176,7 +197,8 @@ func main() {
         },
         Run: func(ctx *forge.RunContext) error {
             table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+                Fields:       map[string]constructs.FieldType{"id": constructs.FieldTypeString},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
             })
 
             site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
