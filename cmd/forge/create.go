@@ -11,8 +11,8 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/spf13/cobra"
 	"github.com/nimbus-local/forge/internal/templates"
+	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 

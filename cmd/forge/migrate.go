@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/nimbus-local/forge/migrate"
+	"github.com/spf13/cobra"
 )
 
 var migrateCmd = &cobra.Command{

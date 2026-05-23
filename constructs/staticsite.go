@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudfront"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/nimbus-local/forge"
 )
 
 // StaticSite serves a pre-built static website from S3 via CloudFront.

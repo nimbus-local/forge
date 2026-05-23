@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/spf13/cobra"
 	"github.com/nimbus-local/forge/secrets"
+	"github.com/spf13/cobra"
 )
 
 var secretCmd = &cobra.Command{
