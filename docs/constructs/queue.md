@@ -3,7 +3,7 @@
 Creates an SQS queue with optional Lambda consumer and dead-letter queue.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 queue := constructs.NewQueue(ctx, "Jobs", &constructs.QueueArgs{
     Consumer: &constructs.FunctionArgs{

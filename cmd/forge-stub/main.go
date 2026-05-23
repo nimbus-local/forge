@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 
-	"github.com/sst-go/forge/dev"
+	"github.com/nimbus-local/forge/dev"
 )
 
 const (

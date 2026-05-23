@@ -12,7 +12,7 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
-	"github.com/sst-go/forge/internal/templates"
+	"github.com/nimbus-local/forge/internal/templates"
 	"gopkg.in/yaml.v3"
 )
 

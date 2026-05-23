@@ -35,7 +35,7 @@ go install ./cmd/forge
 
 | Property | Value |
 |---|---|
-| Module path | `github.com/sst-go/forge` |
+| Module path | `github.com/nimbus-local/forge` |
 | Language | Go 1.22+ |
 | IaC engine | Pulumi Automation API (inline programs) |
 | State backend | S3 (Pulumi-compatible — importable from SST v3 Ion) |
@@ -212,7 +212,7 @@ Known limitations:
 ## File Structure
 
 ```
-github.com/sst-go/forge/
+github.com/nimbus-local/forge/
 │
 ├── forge.go                      CORE LIBRARY — Run(), Config, AppConfig,
 │                                RunContext, Linkable interface, Pulumi runner
@@ -282,7 +282,7 @@ func (x *MyConstruct) LinkName() string           { return x.name }
 ### Imports
 ```go
 import (
-    forge "github.com/sst-go/forge"              // always alias as forge
+    forge "github.com/nimbus-local/forge"              // always alias as forge
     "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
     "github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

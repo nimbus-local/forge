@@ -45,7 +45,7 @@ This is the right trade-off for a getting-started example. For an authenticated 
 - AWS credentials configured (`aws configure` or `AWS_PROFILE`)
 - Go 1.22+
 - Node.js 18+ (Next.js build toolchain — the SSR Lambda runs on `nodejs20.x`)
-- forge CLI: `go install github.com/sst-go/forge/cmd/forge@latest`
+- forge CLI: `go install github.com/nimbus-local/forge/cmd/forge@latest`
 
 Pulumi is downloaded automatically on first deploy to `~/.forge/pulumi/` — no separate install needed.
 

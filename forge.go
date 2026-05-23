@@ -17,7 +17,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/sst-go/forge/internal/pulumibundle"
+	"github.com/nimbus-local/forge/internal/pulumibundle"
 )
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -109,8 +109,8 @@ export default $config({
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {

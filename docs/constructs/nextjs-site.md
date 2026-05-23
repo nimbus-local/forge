@@ -5,7 +5,7 @@ Static assets are served from S3 via CloudFront; SSR pages and API routes run in
 a Node.js 24 Lambda behind a second CloudFront origin.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
     Path: ".",
@@ -185,8 +185,8 @@ After deploy, add a CNAME pointing `www.example.com` → the `url` output.
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {

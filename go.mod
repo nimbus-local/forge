@@ -1,4 +1,4 @@
-module github.com/sst-go/forge
+module github.com/nimbus-local/forge
 
 go 1.24
 

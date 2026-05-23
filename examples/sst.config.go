@@ -4,8 +4,8 @@
 package main
 
 import (
-	"github.com/sst-go/forge"
-	"github.com/sst-go/forge/constructs"
+	"github.com/nimbus-local/forge"
+	"github.com/nimbus-local/forge/constructs"
 )
 
 func main() {

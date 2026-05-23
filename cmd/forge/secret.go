@@ -8,7 +8,7 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
-	"github.com/sst-go/forge/secrets"
+	"github.com/nimbus-local/forge/secrets"
 )
 
 var secretCmd = &cobra.Command{

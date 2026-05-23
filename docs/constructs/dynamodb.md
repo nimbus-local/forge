@@ -3,7 +3,7 @@
 Creates a DynamoDB table with pay-per-request billing, optional GSIs, point-in-time recovery, and deletion protection.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 table := constructs.NewDynamoDB(ctx, "Users", &constructs.DynamoDBArgs{
     Fields: map[string]constructs.FieldType{

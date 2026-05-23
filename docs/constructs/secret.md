@@ -3,7 +3,7 @@
 Resolves an SSM SecureString at deploy time and injects the value into linked Lambda functions.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 dbURL := constructs.NewSecret(ctx, "DatabaseURL", nil)
 ```

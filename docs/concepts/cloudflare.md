@@ -53,10 +53,10 @@ export CLOUDFLARE_ACCOUNT_ID=your-account-id
 
 ## Available constructs
 
-Import from `github.com/sst-go/forge/constructs/cloudflare`:
+Import from `github.com/nimbus-local/forge/constructs/cloudflare`:
 
 ```go
-import cf "github.com/sst-go/forge/constructs/cloudflare"
+import cf "github.com/nimbus-local/forge/constructs/cloudflare"
 ```
 
 | Construct | Description |
@@ -199,9 +199,9 @@ The Go toolchain must be in `PATH`. The compiled WASM binary is uploaded as a `W
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
-    cf "github.com/sst-go/forge/constructs/cloudflare"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
+    cf "github.com/nimbus-local/forge/constructs/cloudflare"
 )
 
 func main() {

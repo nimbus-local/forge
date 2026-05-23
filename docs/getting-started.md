@@ -15,7 +15,7 @@ forge is a Go-native replacement for SST (Serverless Stack). You write your infr
 ## Installation
 
 ```bash
-go install github.com/sst-go/forge/cmd/forge@latest
+go install github.com/nimbus-local/forge/cmd/forge@latest
 ```
 
 Verify:

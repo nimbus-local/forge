@@ -3,7 +3,7 @@
 Creates an AWS Lambda function with sane defaults: ARM64 architecture, 14-day CloudWatch log retention, X-Ray tracing (in non-dev stages), and environment variable injection from linked resources.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 fn := constructs.NewFunction(ctx, "MyFunction", &constructs.FunctionArgs{
     Handler: "bootstrap",

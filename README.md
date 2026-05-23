@@ -30,7 +30,7 @@ Powered by [Pulumi](https://pulumi.com) under the hood — **state files are ful
 ## Installation
 
 ```bash
-go install github.com/sst-go/forge/cmd/forge@latest
+go install github.com/nimbus-local/forge/cmd/forge@latest
 ```
 
 Pulumi is downloaded automatically on first deploy to `~/.forge/pulumi/` — no separate install needed.
@@ -110,8 +110,8 @@ Create `infra/sst.config.go`:
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {
