@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/nimbus-local/forge/internal/bootstrap"
+	"github.com/spf13/cobra"
 )
 
 var bootstrapCmd = &cobra.Command{

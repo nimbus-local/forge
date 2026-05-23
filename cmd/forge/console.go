@@ -13,12 +13,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nimbus-local/forge/secrets"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/spf13/cobra"
-	"github.com/nimbus-local/forge/secrets"
 )
 
 //go:embed consoleassets

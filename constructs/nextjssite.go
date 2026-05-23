@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudfront"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/nimbus-local/forge"
 )
 
 // NextjsSite deploys a Next.js application to AWS using open-next.

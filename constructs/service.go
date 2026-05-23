@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	forge "github.com/nimbus-local/forge"
 	awssdk "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/ecs"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lb"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/nimbus-local/forge"
 )
 
 // ServiceVPCArgs specifies the VPC context for the ECS Fargate tasks.

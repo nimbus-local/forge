@@ -3,9 +3,9 @@ package constructs
 import (
 	"fmt"
 
+	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/dynamodb"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/nimbus-local/forge"
 )
 
 // FieldType maps to DynamoDB attribute types.

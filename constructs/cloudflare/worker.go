@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	forge "github.com/nimbus-local/forge"
 	cf "github.com/pulumi/pulumi-cloudflare/sdk/v5/go/cloudflare"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/nimbus-local/forge"
 )
 
 // WorkerArgs configures a Cloudflare Worker script construct.
