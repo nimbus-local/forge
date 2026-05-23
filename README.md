@@ -92,7 +92,7 @@ If you were already on **SST v3 Ion**, your Pulumi state is in S3 and is fully
 compatible. Set `FORGE_STATE_BUCKET` to point at the same bucket:
 
 ```bash
-export FORGE_STATE_BUCKET=my-app-dev-forge-state
+export FORGE_STATE_BUCKET=my-app-dev-forge-state-123456789012
 forge diff   # should show zero changes if the config was migrated correctly
 ```
 
@@ -288,7 +288,7 @@ don't carry Pulumi as a dependency.
 
 | Variable | Default | Description |
 |---|---|---|
-| `FORGE_STATE_BUCKET` | `<app>-<stage>-forge-state` | S3 bucket for Pulumi state |
+| `FORGE_STATE_BUCKET` | `<app>-<stage>-forge-state-<accountId>` | S3 bucket for Pulumi state |
 | `FORGE_STAGE` | `$USER` or `dev` | Active stage |
 | `PULUMI_CONFIG_PASSPHRASE` | `""` | State encryption passphrase |
 | `AWS_PROFILE` | — | AWS credentials profile |
@@ -331,8 +331,8 @@ Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbu
 
 **AWS validation**
 
-- [ ] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
-- [ ] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
+- [x] Deploy `checklist-simple` to AWS and verify end-to-end (Next.js → API Gateway → Lambda → DynamoDB)
+- [x] Deploy `checklist-full` to AWS and verify end-to-end (Next.js + GitHub OAuth + Go Lambda + DynamoDB)
 - [ ] Dedicated smoke-test app exercising every construct: Function, Queue, Topic, Cron, Service, Secret
 
 **Nimbus parity**

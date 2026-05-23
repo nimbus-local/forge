@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	forge "github.com/nimbus-local/forge"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
-	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudwatch"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
+	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -54,10 +54,10 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 		args = &FunctionArgs{}
 	}
 	if args.Runtime == "" {
-		args.Runtime = "provided.al2023"
+		args.Runtime = RuntimeGo
 	}
 	if args.Architecture == "" {
-		args.Architecture = "arm64"
+		args.Architecture = ArchARM64
 	}
 	if args.Timeout == 0 {
 		args.Timeout = 10
@@ -137,7 +137,7 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 		fnArgs.Description = pulumi.String(args.Description)
 	}
 	if args.Code != "" {
-		fnArgs.Code = pulumi.NewFileArchive(args.Code)
+		fnArgs.Code = pulumi.NewFileArchive(resolvePath(ctx, args.Code))
 	}
 
 	fn, err := awslambda.NewFunction(pctx, name, fnArgs)

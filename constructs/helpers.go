@@ -2,6 +2,7 @@ package constructs
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -15,10 +16,10 @@ func qualifiedName(ctx *forge.RunContext, name string) string {
 	return fmt.Sprintf("%s-%s-%s", ctx.App.Name, ctx.Stage, name)
 }
 
-// bucketName returns a qualified S3 bucket name lowercased to satisfy the
-// S3 naming constraint (only lowercase alphanumeric characters and hyphens).
+// bucketName returns a globally unique S3 bucket name, lowercased to satisfy
+// S3 naming constraints. The account ID suffix prevents collisions across accounts.
 func bucketName(ctx *forge.RunContext, name string) string {
-	return strings.ToLower(qualifiedName(ctx, name))
+	return strings.ToLower(fmt.Sprintf("%s-%s", qualifiedName(ctx, name), ctx.AccountID))
 }
 
 // defaultTags returns the standard set of resource tags used by all constructs,
@@ -51,6 +52,17 @@ func envKey(name string) string {
 	s := b.String()
 	s = strings.ReplaceAll(s, "-", "_")
 	return s
+}
+
+// resolvePath returns an absolute path. If p is already absolute it is returned
+// unchanged. If relative, it is resolved against ctx.WorkDir (the infra/
+// directory at deploy time) — not the process CWD, which Pulumi changes to its
+// own workspace temp directory before running inline programs.
+func resolvePath(ctx *forge.RunContext, p string) string {
+	if filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(ctx.WorkDir, p)
 }
 
 // panicOnErr panics with a descriptive message if err is non-nil.

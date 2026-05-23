@@ -25,12 +25,10 @@ on first deploy, so you rarely need to run this command directly.`,
 		stage := resolveStage()
 		appName := appNameFromConfig()
 
-		bucketName := bootstrap.BucketName(appName, stage)
 		fmt.Printf("\n%s  Bootstrapping state bucket for %s/%s\n",
 			bold.Render("◈"), bold.Render(appName), bold.Render(stage))
-		fmt.Printf("%s  Bucket: %s\n\n", dim.Render("  "), dim.Render(bucketName))
 
-		created, err := bootstrap.EnsureStateBucket(context.Background(), bootstrap.Config{
+		bucketName, created, err := bootstrap.EnsureStateBucket(context.Background(), bootstrap.Config{
 			AppName:    appName,
 			Stage:      stage,
 			AWSProfile: flagProfile,

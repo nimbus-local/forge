@@ -11,6 +11,9 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   secret: process.env.SST_SECRET_NEXTAUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: '/login',
+  },
   callbacks: {
     // Expose the GitHub user ID in the session so the API proxy can forward it
     // to the Go Lambda as the x-user-id header.

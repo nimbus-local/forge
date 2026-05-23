@@ -76,7 +76,7 @@ func init() {
 // ensureBootstrapped silently creates the state bucket if it doesn't exist yet.
 // Prints a one-line notice only when the bucket is newly created.
 func ensureBootstrapped(stage string) error {
-	created, err := bootstrap.EnsureStateBucket(context.Background(), bootstrap.Config{
+	bucketName, created, err := bootstrap.EnsureStateBucket(context.Background(), bootstrap.Config{
 		AppName:    appNameFromConfig(),
 		Stage:      stage,
 		AWSProfile: flagProfile,
@@ -88,7 +88,7 @@ func ensureBootstrapped(stage string) error {
 	if created {
 		fmt.Printf("%s  Created state bucket %s\n\n",
 			green.Render("✓"),
-			dim.Render(bootstrap.BucketName(appNameFromConfig(), stage)),
+			dim.Render(bucketName),
 		)
 	}
 	return nil

@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	forge "github.com/nimbus-local/forge"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudfront"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
-	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudfront"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudwatch"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
+	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -89,7 +89,7 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 		panic("forge: NextjsSiteArgs.DomainCertArn is required when Domain is set for " + name)
 	}
 
-	absPath, err := filepath.Abs(projectPath)
+	absPath, err := filepath.Abs(resolvePath(ctx, projectPath))
 	panicOnErr(err, name+": resolve project path")
 
 	// ── Build with open-next ──────────────────────────────────────────────────
@@ -175,9 +175,9 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	fn, err := awslambda.NewFunction(pctx, name+"-server", &awslambda.FunctionArgs{
 		Name:          pulumi.String(qualifiedName(ctx, name+"-server")),
 		Role:          role.Arn,
-		Runtime:       pulumi.String("nodejs24.x"),
+		Runtime:       pulumi.String(RuntimeNodeJS24),
 		Handler:       pulumi.String("index.handler"),
-		Architectures: pulumi.StringArray{pulumi.String("arm64")},
+		Architectures: pulumi.StringArray{pulumi.String(ArchARM64)},
 		MemorySize:    pulumi.Int(args.MemorySize),
 		Timeout:       pulumi.Int(args.Timeout),
 		Code:          pulumi.NewFileArchive(serverFnDir),

@@ -11,6 +11,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // Config holds the parameters needed to locate or create the state bucket.
@@ -21,9 +22,10 @@ type Config struct {
 	AWSRegion  string
 }
 
-// BucketName returns the conventional state bucket name for the given app and stage.
-func BucketName(appName, stage string) string {
-	return fmt.Sprintf("%s-%s-forge-state", appName, stage)
+// BucketName returns the conventional state bucket name for the given app, stage,
+// and AWS account ID. The account ID suffix ensures global uniqueness across accounts.
+func BucketName(appName, stage, accountID string) string {
+	return fmt.Sprintf("%s-%s-forge-state-%s", appName, stage, accountID)
 }
 
 // s3API is the subset of *s3.Client used by bootstrap, extracted for testing.
@@ -37,14 +39,28 @@ type s3API interface {
 }
 
 // EnsureStateBucket creates the Pulumi state S3 bucket if it does not already exist.
-// Returns true if the bucket was created, false if it already existed.
+// Returns the bucket name, whether it was created, and any error.
 // Safe to call multiple times — idempotent.
-func EnsureStateBucket(ctx context.Context, cfg Config) (created bool, err error) {
-	client, region, err := newClient(ctx, cfg)
+func EnsureStateBucket(ctx context.Context, cfg Config) (bucketName string, created bool, err error) {
+	client, region, awsCfg, err := newClient(ctx, cfg)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
-	return ensureWithClient(ctx, client, BucketName(cfg.AppName, cfg.Stage), region)
+	accountID, err := resolveAccountID(ctx, awsCfg)
+	if err != nil {
+		return "", false, fmt.Errorf("resolve account ID: %w", err)
+	}
+	name := BucketName(cfg.AppName, cfg.Stage, accountID)
+	created, err = ensureWithClient(ctx, client, name, region)
+	return name, created, err
+}
+
+func resolveAccountID(ctx context.Context, awsCfg aws.Config) (string, error) {
+	out, err := sts.NewFromConfig(awsCfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(out.Account), nil
 }
 
 // ensureWithClient is the testable core of EnsureStateBucket.
@@ -67,7 +83,7 @@ func ensureWithClient(ctx context.Context, client s3API, name, region string) (b
 
 // ── internal helpers ──────────────────────────────────────────────────────────
 
-func newClient(ctx context.Context, cfg Config) (*s3.Client, string, error) {
+func newClient(ctx context.Context, cfg Config) (*s3.Client, string, aws.Config, error) {
 	opts := []func(*awsconfig.LoadOptions) error{}
 	if cfg.AWSProfile != "" {
 		opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.AWSProfile))
@@ -77,7 +93,7 @@ func newClient(ctx context.Context, cfg Config) (*s3.Client, string, error) {
 	}
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, "", fmt.Errorf("load aws config: %w", err)
+		return nil, "", aws.Config{}, fmt.Errorf("load aws config: %w", err)
 	}
 	region := awsCfg.Region
 	if region == "" {
@@ -90,7 +106,7 @@ func newClient(ctx context.Context, cfg Config) (*s3.Client, string, error) {
 			o.UsePathStyle = true // required for path-style URLs on local endpoints
 		})
 	}
-	return s3.NewFromConfig(awsCfg, clientOpts...), region, nil
+	return s3.NewFromConfig(awsCfg, clientOpts...), region, awsCfg, nil
 }
 
 func bucketExists(ctx context.Context, client s3API, name string) (bool, error) {

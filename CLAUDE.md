@@ -337,6 +337,112 @@ SigV4 signing to reach the Lambda. Application-level auth (Auth.js, GitHub OAuth
 middleware) still runs inside the Lambda and is unaffected. A Next.js site using GitHub
 OAuth works correctly with `AuthorizationType: NONE`.
 
+### NextjsSite: next-auth integration gotchas
+
+These were discovered building `examples/checklist-full`. Violating any of them produces
+silent or misleading errors (server error pages, NO_SECRET, assets 404ing).
+
+**1. `SessionProvider` must be in a `"use client"` wrapper.**
+
+`SessionProvider` from `next-auth/react` uses React Context. Rendering it directly in a
+Server Component (e.g. `app/layout.tsx`) throws `Error: React Context is unavailable in
+Server Components`. Always extract it:
+
+```tsx
+// app/providers.tsx
+'use client'
+import { SessionProvider } from 'next-auth/react'
+export function Providers({ children, session }) {
+  return <SessionProvider session={session}>{children}</SessionProvider>
+}
+
+// app/layout.tsx  ← Server Component, no 'use client'
+import { Providers } from './providers'
+export default async function RootLayout({ children }) {
+  const session = await getServerSession(authOptions)
+  return <html><body><Providers session={session}>{children}</Providers></body></html>
+}
+```
+
+**2. Never use the bare next-auth middleware re-export.**
+
+```typescript
+// ❌ reads NEXTAUTH_SECRET directly, ignores authOptions, breaks behind CloudFront
+export { default } from 'next-auth/middleware'
+```
+
+The bare re-export reads `process.env.NEXTAUTH_SECRET` at the module level and derives the
+redirect URL from the request `Host` header. Behind CloudFront + Lambda Function URL the
+`Host` header is the Lambda URL, not the CloudFront domain. This causes:
+- `[next-auth][error][NO_SECRET]` if only `SST_SECRET_NEXTAUTH_SECRET` is set
+- Redirects that send the browser to the raw Lambda URL domain
+- Static asset 404s because `/_next/static/*` only exists on CloudFront/S3
+
+Always use a custom middleware with `getToken`:
+
+```typescript
+// ✅ middleware.ts
+import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const token = await getToken({
+    req,
+    secret: process.env.SST_SECRET_NEXTAUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  })
+  if (!token) {
+    const base = process.env.NEXTAUTH_URL ?? req.nextUrl.origin
+    const loginUrl = new URL('/login', base)
+    loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
+    return NextResponse.redirect(loginUrl)
+  }
+  return NextResponse.next()
+}
+```
+
+**3. `NEXTAUTH_URL` must be set as a Lambda env var.**
+
+Without it, next-auth constructs OAuth callback URLs and sign-in form actions using the
+request origin — which is the Lambda Function URL, not CloudFront. The GitHub OAuth callback
+will fail and clicking "Sign in with GitHub" will do nothing (JS chunk 404s before handlers
+attach). Set it in `NextjsSiteArgs.Environment`:
+
+```go
+site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
+    Path: "../web",
+    Environment: map[string]string{
+        "NEXTAUTH_URL": "https://<your-cloudfront-or-custom-domain>",
+    },
+    Link: []forge.Linkable{...},
+})
+```
+
+Update this value when adding a custom domain. This is a temporary workaround — the
+permanent fix (roadmap item 8) adds a CloudFront viewer-request function that copies
+`Host` → `x-forwarded-host` automatically.
+
+**4. `authOptions` must declare `pages.signIn`.**
+
+Without it, next-auth redirects unauthenticated users to its built-in `/api/auth/signin`
+page rather than your custom login page. Add to `authOptions`:
+
+```typescript
+pages: {
+  signIn: '/login',
+},
+```
+
+**5. GitHub OAuth app callback URL.**
+
+The GitHub OAuth app's "Authorization callback URL" must be:
+```
+<NEXTAUTH_URL>/api/auth/callback/github
+```
+e.g. `https://d6ee090je5y94.cloudfront.net/api/auth/callback/github`. If this does not
+match exactly (including scheme and path), GitHub will reject the OAuth redirect and the
+sign-in flow will fail with a redirect_uri_mismatch error.
+
 ---
 
 ## Planned Features
@@ -405,7 +511,31 @@ The `runPulumi()` function must read StageConfig and:
 3. Merge StageConfig.Tags into `defaultTags()`
 4. Block `forge remove` if `Protected: true` and `--force` not passed
 
-### 3. Missing AWS Constructs
+### 3. Configurable Resource Name Suffix
+
+Currently all S3 bucket names (state bucket and construct buckets) are suffixed with the
+AWS account ID to guarantee global uniqueness. A future option to override this suffix
+would be useful when:
+- Migrating from SST or another tool that used a different naming convention
+- Teams that prefer a shorter custom suffix (e.g. a project code) over the 12-digit account ID
+- CI environments that need deterministic, human-readable bucket names
+
+Add `BucketSuffix` to `AppConfig`:
+```go
+type AppConfig struct {
+    Name         string
+    Home         string
+    Removal      RemovalPolicy
+    BucketSuffix string   // overrides the account ID suffix on all S3 bucket names
+    Cloudflare   *CloudflareConfig
+}
+```
+
+When `BucketSuffix` is set, use it instead of the account ID in both `bucketName()` (constructs)
+and `BucketName()` (state bucket). When empty, fall back to the account ID (current behaviour).
+Store the suffix on `RunContext` alongside `AccountID` so constructs can access it.
+
+### 4. Missing AWS Constructs
 
 #### `constructs/cron.go` — EventBridge Scheduler
 ```go
@@ -593,11 +723,160 @@ Implementation in `cmd/forge/create.go`:
 4. Run `go mod tidy` in each module dir
 5. Print next steps
 
-### 7. Documentation
+### 7. KMS Encryption + Configurable Retention
+
+#### `constructs/kms.go` — KMS Key
+
+A managed KMS key construct that can be attached to any resource requiring encryption at rest.
+
+```go
+type KMSKeyArgs struct {
+    // Description is a human-readable description of the key's purpose.
+    Description string
+    // EnableRotation enables automatic annual key rotation. Defaults to true.
+    EnableRotation bool
+    // DeletionWindowInDays is the waiting period before key deletion (7–30). Defaults to 30.
+    DeletionWindowInDays int
+}
+func NewKMSKey(ctx *forge.RunContext, name string, args *KMSKeyArgs) *KMSKey
+// LinkEnv: SST_KMS_<NAME>_ARN, SST_KMS_<NAME>_ID
+```
+
+Creates: KMS symmetric key with key policy granting the account full access. Rotation enabled by default.
+
+The key ARN is exposed so it can be passed to other constructs via a `KMSKeyArn string` field:
+
+```go
+key := constructs.NewKMSKey(ctx, "DataKey", nil)
+
+// S3 bucket encrypted with the key
+bucket := constructs.NewBucket(ctx, "Uploads", &constructs.BucketArgs{
+    KMSKeyArn: key.ARN(),
+})
+
+// Lambda log group encrypted with the key
+fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
+    KMSKeyArn: key.ARN(),   // encrypts both the function env vars and its log group
+})
+
+// DynamoDB table encrypted with the key
+table := constructs.NewDynamoDB(ctx, "Users", &constructs.DynamoDBArgs{
+    KMSKeyArn: key.ARN(),
+})
+```
+
+#### KMS integration per construct
+
+| Construct | Field | What it encrypts |
+|---|---|---|
+| `NewBucket` | `KMSKeyArn pulumi.StringInput` | S3 server-side encryption (SSE-KMS) |
+| `NewFunction` | `KMSKeyArn pulumi.StringInput` | Lambda env var encryption + CloudWatch log group |
+| `NewNextjsSite` | `KMSKeyArn pulumi.StringInput` | SSR Lambda env vars + log group + assets bucket |
+| `NewDynamoDB` | `KMSKeyArn pulumi.StringInput` | DynamoDB SSE-KMS (replaces default AWS-owned key) |
+| `NewQueue` | `KMSKeyArn pulumi.StringInput` | SQS message encryption |
+| `NewTopic` | `KMSKeyArn pulumi.StringInput` | SNS message encryption |
+| Secrets (SSM) | automatic | SecureString params already use SSM-managed KMS; optionally accept a custom key ARN |
+
+When `KMSKeyArn` is set, the construct must also grant `kms:GenerateDataKey`, `kms:Decrypt`, and `kms:DescribeKey` to whichever IAM principal needs it (Lambda execution role, CloudWatch Logs service, SNS, SQS). Add these grants automatically inside each constructor using `aws.kms.NewGrant` or an inline key policy statement.
+
+#### Configurable CloudWatch log retention
+
+Currently hardcoded to 14 days in `NewFunction` and `NewNextjsSite`. Add `LogRetentionDays int` to both args structs:
+
+```go
+// FunctionArgs and NextjsSiteArgs
+LogRetentionDays int  // 0 = use default (14). Set to -1 to never expire.
+```
+
+Valid values match the CloudWatch API: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653. Any other non-zero value panics with a helpful message listing valid options.
+
+#### Configurable S3 object lifecycle
+
+Add `LifecycleDays int` to `BucketArgs`:
+
+```go
+// BucketArgs
+LifecycleDays int  // 0 = no lifecycle rule. When set, expire current objects after N days.
+```
+
+When `Versioning` is also true, add a noncurrent version expiration rule at `LifecycleDays` as well. This covers the common use case of auto-purging old uploads or log exports without manual AWS console work.
+
+The state bucket in `internal/bootstrap/bootstrap.go` already has a hardcoded 90-day noncurrent version expiration — leave that as-is.
+
+### 8. NextjsSite: CloudFront Host Header Forwarding
+
+**Problem:** CloudFront forwards requests to the Lambda Function URL with the Lambda URL as the
+`Host` header. The browser's original public hostname (e.g. `d6ee090je5y94.cloudfront.net`) is
+lost. Any server-side code that derives its public URL from the request host — including
+`next-auth/middleware`, `getServerSession`, and any framework that constructs absolute redirect
+URLs — will produce links pointing at the raw Lambda URL. This causes static asset 404s and
+broken OAuth flows because the browser ends up on the wrong domain.
+
+**Fix:** Add a lightweight CloudFront viewer-request function to `NewNextjsSite` that copies the
+`Host` header (which contains the CloudFront domain at the viewer edge) to `x-forwarded-host`
+before the request is forwarded to the Lambda origin:
+
+```go
+hostFwdFn, err := cloudfront.NewFunction(pctx, name+"-host-fwd", &cloudfront.FunctionArgs{
+    Name:    pulumi.String(qualifiedName(ctx, name+"-host-fwd")),
+    Runtime: pulumi.String("cloudfront-js-2.0"),
+    Publish: pulumi.Bool(true),
+    Code: pulumi.String(`function handler(event) {
+  var req = event.request;
+  req.headers["x-forwarded-host"] = { value: req.headers["host"].value };
+  return req;
+}`),
+})
+panicOnErr(err, name+": host-forward function")
+```
+
+Associate it with **both** the default cache behavior (Lambda/SSR) and any Lambda-backed ordered
+behaviors as a `viewer-request` event:
+
+```go
+FunctionAssociations: cloudfront.DistributionDefaultCacheBehaviorFunctionAssociationArray{
+    &cloudfront.DistributionDefaultCacheBehaviorFunctionAssociationArgs{
+        EventType:   pulumi.String("viewer-request"),
+        FunctionArn: hostFwdFn.Arn,
+    },
+},
+```
+
+With `x-forwarded-host` set, Next.js middleware can read the correct public domain:
+
+```typescript
+// middleware.ts — reads x-forwarded-host set by the CloudFront Function
+const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
+const base = `https://${host}`
+```
+
+**Impact:** Users no longer need to hardcode `NEXTAUTH_URL` in their infra config for the
+host-derivation problem. Custom domains work automatically. This matches what SST Ion does in
+their `NextjsSite` construct. Update the checklist-full example's `middleware.ts` and remove
+the `NEXTAUTH_URL` env var from its infra config once this is implemented.
+
+### 9. NextjsSite: Image Optimization Lambda
+
+open-next produces an `image-optimization-function` alongside the SSR Lambda, but
+`NewNextjsSite` currently only deploys the SSR Lambda. Without the image optimization
+function, `/_next/image` requests hit the SSR Lambda and 404, so `next/image` components
+render broken images.
+
+**Fix:**
+1. Deploy `.open-next/image-optimization-function` as a second Lambda (Node.js, arm64).
+2. Add a CloudFront ordered cache behavior for `/_next/image*` pointing at the image
+   optimization Lambda Function URL.
+3. Grant the image Lambda access to the S3 assets bucket for local image optimization.
+
+Until this is implemented, users must set `images: { unoptimized: true }` in
+`next.config.js` to bypass the optimization endpoint. Document this in the construct
+godoc and in `docs/constructs/nextjssite.md`.
+
+### 10. Documentation
 
 Every exported type, function, method, and constant needs a godoc comment. `docs/` directory with getting-started, migration guide, config reference, per-construct references, and concept guides (stages, linking, secrets, dev-tunnel, state).
 
-### 8. Deploy Output Enhancement
+### 11. Deploy Output Enhancement
 
 Parse `UpResult` and format a clean summary table after deployment showing resource changes (created/updated/deleted) and stack outputs.
 

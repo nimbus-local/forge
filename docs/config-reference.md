@@ -35,7 +35,7 @@ type AppConfig struct {
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `Name` | `string` | — | App name. Used in resource names and state bucket. Must be unique per AWS account. |
+| `Name` | `string` | — | App name. Used in resource names and state bucket (`<name>-<stage>-forge-state-<accountId>`). |
 | `Home` | `string` | `"aws"` | Cloud provider: `"aws"`, `"cloudflare"`, or `"aws+cloudflare"` |
 | `Removal` | `RemovalPolicy` | `RemovalDestroy` | What happens to resources on `forge remove` |
 | `Cloudflare` | `*CloudflareConfig` | nil | Cloudflare account settings (required when `Home` includes cloudflare) |

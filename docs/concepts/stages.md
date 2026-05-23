@@ -16,8 +16,8 @@ my-app-dev-UsersTable   ← completely separate DynamoDB table
 
 The Pulumi state bucket is also stage-specific:
 ```
-s3://my-app-prod-forge-state
-s3://my-app-dev-forge-state
+s3://my-app-prod-forge-state-123456789012
+s3://my-app-dev-forge-state-123456789012
 ```
 
 ---

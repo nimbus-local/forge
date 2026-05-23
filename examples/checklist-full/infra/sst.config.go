@@ -5,7 +5,7 @@ import (
 
 	forge "github.com/nimbus-local/forge"
 	"github.com/nimbus-local/forge/constructs"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -42,6 +42,14 @@ func main() {
 			//   forge secret set GithubSecret   <github-oauth-client-secret>
 			//   forge secret set NextauthSecret <random-32+-char-string>
 			//   forge secret set InternalKey    <random-32+-char-string>
+			//
+			// GitHub OAuth app setup:
+			//   Homepage URL:              <NEXTAUTH_URL>
+			//   Authorization callback URL: <NEXTAUTH_URL>/api/auth/callback/github
+			//
+			// NEXTAUTH_URL is the public CloudFront URL (or custom domain) set below.
+			// The callback path /api/auth/callback/github is required by next-auth and
+			// must match exactly — including scheme — or GitHub returns redirect_uri_mismatch.
 
 			githubId := constructs.NewSecret(ctx, "GithubId", nil)
 			githubSecret := constructs.NewSecret(ctx, "GithubSecret", nil)
@@ -99,9 +107,19 @@ func main() {
 			//   SST_SECRET_GITHUB_ID      — GitHub OAuth client ID
 			//   SST_SECRET_GITHUB_SECRET  — GitHub OAuth client secret
 
+			// NEXTAUTH_URL must match the public URL of the site so next-auth can
+			// construct correct OAuth callback URLs. Update this when adding a custom domain.
+			nextauthURL := "https://d6ee090je5y94.cloudfront.net"
+			if ctx.Stage == "production" {
+				nextauthURL = "https://your-production-domain.com"
+			}
+
 			site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
 				Path: "../web",
 				Link: []forge.Linkable{api, internalKey, nextauthSecret, githubId, githubSecret},
+				Environment: map[string]string{
+					"NEXTAUTH_URL": nextauthURL,
+				},
 			})
 
 			// ── Outputs ───────────────────────────────────────────────────────
