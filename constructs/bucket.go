@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	forge "github.com/nimbus-local/forge"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -40,12 +40,6 @@ func NewBucket(ctx *forge.RunContext, name string, args *BucketArgs) *Bucket {
 		Tags:   defaultTags(ctx, name),
 	}
 
-	if args.Versioning {
-		bucketArgs.Versioning = &s3.BucketVersioningArgs{
-			Enabled: pulumi.Bool(true),
-		}
-	}
-
 	if args.CORS {
 		origins := args.CORSAllowOrigins
 		if len(origins) == 0 {
@@ -69,6 +63,16 @@ func NewBucket(ctx *forge.RunContext, name string, args *BucketArgs) *Bucket {
 
 	bucket, err := s3.NewBucket(pctx, name, bucketArgs)
 	panicOnErr(err, name+": s3 bucket")
+
+	if args.Versioning {
+		_, err = s3.NewBucketVersioningV2(pctx, name+"-versioning", &s3.BucketVersioningV2Args{
+			Bucket: bucket.Bucket,
+			VersioningConfiguration: &s3.BucketVersioningV2VersioningConfigurationArgs{
+				Status: pulumi.String("Enabled"),
+			},
+		})
+		panicOnErr(err, name+": bucket versioning")
+	}
 
 	// Block all public access unless explicitly set to Public.
 	if !args.Public {

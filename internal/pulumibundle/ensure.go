@@ -14,17 +14,14 @@ import (
 	"runtime"
 )
 
-// version is pinned to match go.mod's pulumi/sdk/v3 dependency.
-const version = "3.148.0"
-
 // EnsureDir returns a root directory that contains a Pulumi binary at
 // <root>/bin/pulumi (or pulumi.exe on Windows), downloading and
-// extracting it if missing.
+// extracting it if missing. Pass forge.PulumiVersion as version.
 //
 // Pass the returned path to the Automation API:
 //
 //	cmd, _ := auto.NewPulumiCommand(&auto.PulumiCommandOptions{Root: root})
-func EnsureDir() (string, error) {
+func EnsureDir(version string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("pulumibundle: home dir: %w", err)
@@ -38,7 +35,7 @@ func EnsureDir() (string, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "◈  Downloading Pulumi v%s\n", version)
-	if err := install(root); err != nil {
+	if err := install(root, version); err != nil {
 		return "", fmt.Errorf("pulumibundle: install: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "\n✓  Pulumi v%s ready\n\n", version)
@@ -54,7 +51,7 @@ func binaryName() string {
 	return "pulumi"
 }
 
-func releaseURL() string {
+func releaseURL(version string) string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
 	if arch == "amd64" {
@@ -70,12 +67,12 @@ func releaseURL() string {
 	)
 }
 
-func install(root string) error {
+func install(root, version string) error {
 	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
 		return err
 	}
 
-	url := releaseURL()
+	url := releaseURL(version)
 	resp, err := http.Get(url) //nolint:noctx
 	if err != nil {
 		return fmt.Errorf("download %s: %w", url, err)

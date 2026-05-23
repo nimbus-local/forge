@@ -101,7 +101,7 @@ docker compose up
 
 # Terminal 2 — deploy to local
 export FORGE_AWS_ENDPOINT=http://localhost:4566
-export FORGE_STATE_BUCKET=my-app-local-forge-state   # optional: fixed bucket name
+export FORGE_STATE_BUCKET=my-app-local-forge-state   # optional: override auto-generated name
 
 forge bootstrap --stage local        # creates state bucket in Nimbus
 forge deploy --stage local           # deploys all constructs to Nimbus

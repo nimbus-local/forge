@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	forge "github.com/nimbus-local/forge"
-	awslambda "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/sns"
+	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/sns"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

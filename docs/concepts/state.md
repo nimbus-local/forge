@@ -9,8 +9,10 @@ forge uses Pulumi's Automation API with an S3 backend to store infrastructure st
 Each stage gets its own state bucket:
 
 ```
-s3://<appName>-<stage>-forge-state
+s3://<appName>-<stage>-forge-state-<accountId>
 ```
+
+The AWS account ID suffix guarantees global uniqueness across accounts — important for open-source projects and teams with multiple AWS accounts.
 
 The bucket is created automatically by `forge bootstrap` and by the first `forge deploy` if it doesn't exist yet.
 
@@ -94,11 +96,11 @@ Because versioning is enabled, you can restore a previous state version from the
 ```bash
 # List state versions
 aws s3api list-object-versions \
-  --bucket myapp-prod-forge-state \
+  --bucket myapp-prod-forge-state-123456789012 \
   --prefix ".pulumi/stacks/myapp/prod.json"
 
 # Restore a previous version (copy it over the current)
 aws s3 cp \
-  "s3://myapp-prod-forge-state/.pulumi/stacks/myapp/prod.json?versionId=<old-id>" \
-  "s3://myapp-prod-forge-state/.pulumi/stacks/myapp/prod.json"
+  "s3://myapp-prod-forge-state-123456789012/.pulumi/stacks/myapp/prod.json?versionId=<old-id>" \
+  "s3://myapp-prod-forge-state-123456789012/.pulumi/stacks/myapp/prod.json"
 ```

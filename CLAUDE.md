@@ -405,7 +405,31 @@ The `runPulumi()` function must read StageConfig and:
 3. Merge StageConfig.Tags into `defaultTags()`
 4. Block `forge remove` if `Protected: true` and `--force` not passed
 
-### 3. Missing AWS Constructs
+### 3. Configurable Resource Name Suffix
+
+Currently all S3 bucket names (state bucket and construct buckets) are suffixed with the
+AWS account ID to guarantee global uniqueness. A future option to override this suffix
+would be useful when:
+- Migrating from SST or another tool that used a different naming convention
+- Teams that prefer a shorter custom suffix (e.g. a project code) over the 12-digit account ID
+- CI environments that need deterministic, human-readable bucket names
+
+Add `BucketSuffix` to `AppConfig`:
+```go
+type AppConfig struct {
+    Name         string
+    Home         string
+    Removal      RemovalPolicy
+    BucketSuffix string   // overrides the account ID suffix on all S3 bucket names
+    Cloudflare   *CloudflareConfig
+}
+```
+
+When `BucketSuffix` is set, use it instead of the account ID in both `bucketName()` (constructs)
+and `BucketName()` (state bucket). When empty, fall back to the account ID (current behaviour).
+Store the suffix on `RunContext` alongside `AccountID` so constructs can access it.
+
+### 4. Missing AWS Constructs
 
 #### `constructs/cron.go` — EventBridge Scheduler
 ```go

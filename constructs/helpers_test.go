@@ -1,6 +1,7 @@
 package constructs
 
 import (
+	"path/filepath"
 	"testing"
 
 	forge "github.com/nimbus-local/forge"
@@ -28,6 +29,66 @@ func TestQualifiedName(t *testing.T) {
 			}
 			if got := qualifiedName(ctx, tc.name); got != tc.want {
 				t.Errorf("qualifiedName(%q, %q, %q) = %q, want %q", tc.appName, tc.stage, tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	t.Parallel()
+	ctx := &forge.RunContext{
+		Stage:   "dev",
+		App:     &forge.AppConfig{Name: "myapp"},
+		WorkDir: "/home/user/project/infra",
+	}
+
+	t.Run("relative path resolved against WorkDir", func(t *testing.T) {
+		t.Parallel()
+		got := resolvePath(ctx, "../functions/api.zip")
+		want := filepath.Join("/home/user/project/infra", "../functions/api.zip")
+		if got != want {
+			t.Errorf("resolvePath(relative) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("absolute path returned unchanged", func(t *testing.T) {
+		t.Parallel()
+		abs := "/usr/local/functions/api.zip"
+		got := resolvePath(ctx, abs)
+		if got != abs {
+			t.Errorf("resolvePath(absolute) = %q, want %q", got, abs)
+		}
+	})
+
+	t.Run("dot path resolved against WorkDir", func(t *testing.T) {
+		t.Parallel()
+		got := resolvePath(ctx, ".")
+		want := filepath.Join("/home/user/project/infra", ".")
+		if got != want {
+			t.Errorf("resolvePath(.) = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestBucketName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		appName, stage, accountID, name, want string
+	}{
+		{"myapp", "dev", "123456789012", "Uploads", "myapp-dev-uploads-123456789012"},
+		{"todo-api", "prod", "999999999999", "Assets", "todo-api-prod-assets-999999999999"},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.want, func(t *testing.T) {
+			t.Parallel()
+			ctx := &forge.RunContext{
+				Stage:     tc.stage,
+				App:       &forge.AppConfig{Name: tc.appName},
+				AccountID: tc.accountID,
+			}
+			if got := bucketName(ctx, tc.name); got != tc.want {
+				t.Errorf("bucketName(%q) = %q, want %q", tc.name, got, tc.want)
 			}
 		})
 	}

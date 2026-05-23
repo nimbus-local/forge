@@ -58,7 +58,7 @@ func NewWorker(ctx *forge.RunContext, name string, args *WorkerArgs) *Worker {
 	pctx := ctx.Pulumi()
 
 	// ── Build worker content ──────────────────────────────────────────────────
-	content, webassemblyBindings := buildWorkerContent(name, args)
+	content, webassemblyBindings := buildWorkerContent(name, ctx.WorkDir, args)
 
 	// ── KV namespace bindings ─────────────────────────────────────────────────
 	var kvBindings cf.WorkersScriptKvNamespaceBindingArray
@@ -161,19 +161,22 @@ func (w *Worker) LinkName() string { return w.name }
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 // buildWorkerContent returns the JS content string and any WASM bindings.
-func buildWorkerContent(name string, args *WorkerArgs) (string, cf.WorkersScriptWebassemblyBindingArray) {
-	if args.GoHandler != "" {
-		return buildGoWASMWorker(name, args.GoHandler)
+func buildWorkerContent(name, workDir string, args *WorkerArgs) (string, cf.WorkersScriptWebassemblyBindingArray) {
+	resolve := func(p string) string {
+		if filepath.IsAbs(p) {
+			return p
+		}
+		return filepath.Join(workDir, p)
 	}
-	return buildJSWorker(args.Handler), nil
+	if args.GoHandler != "" {
+		return buildGoWASMWorker(name, resolve(args.GoHandler))
+	}
+	return buildJSWorker(resolve(args.Handler)), nil
 }
 
 // buildJSWorker reads a JS/TS entry point, bundling with esbuild CLI if available.
 func buildJSWorker(handler string) string {
-	abs, err := filepath.Abs(handler)
-	if err != nil {
-		panic("forge: cannot resolve Handler path: " + err.Error())
-	}
+	abs := handler
 
 	// Try to bundle with esbuild CLI (must be in PATH).
 	if esbuildPath, lookErr := exec.LookPath("esbuild"); lookErr == nil {
@@ -209,12 +212,7 @@ func buildGoWASMWorker(name, goHandler string) (string, cf.WorkersScriptWebassem
 	tmp.Close()
 	defer os.Remove(tmp.Name())
 
-	abs, err := filepath.Abs(goHandler)
-	if err != nil {
-		panic("forge: cannot resolve GoHandler path: " + err.Error())
-	}
-
-	cmd := exec.Command("go", "build", "-o", tmp.Name(), abs)
+	cmd := exec.Command("go", "build", "-o", tmp.Name(), goHandler)
 	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=wasip1")
 	if out, buildErr := cmd.CombinedOutput(); buildErr != nil {
 		panic(fmt.Sprintf("forge: go build WASM failed for %q:\n%s", goHandler, out))

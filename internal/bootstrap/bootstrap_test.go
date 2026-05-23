@@ -61,17 +61,17 @@ func (m *mockS3) PutBucketLifecycleConfiguration(_ context.Context, _ *s3.PutBuc
 func TestBucketName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		app, stage, want string
+		app, stage, accountID, want string
 	}{
-		{"myapp", "dev", "myapp-dev-forge-state"},
-		{"todo-api", "prod", "todo-api-prod-forge-state"},
+		{"myapp", "dev", "123456789012", "myapp-dev-forge-state-123456789012"},
+		{"todo-api", "prod", "999999999999", "todo-api-prod-forge-state-999999999999"},
 	}
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.want, func(t *testing.T) {
 			t.Parallel()
-			if got := BucketName(tc.app, tc.stage); got != tc.want {
-				t.Errorf("BucketName(%q, %q) = %q, want %q", tc.app, tc.stage, got, tc.want)
+			if got := BucketName(tc.app, tc.stage, tc.accountID); got != tc.want {
+				t.Errorf("BucketName(%q, %q, %q) = %q, want %q", tc.app, tc.stage, tc.accountID, got, tc.want)
 			}
 		})
 	}
@@ -182,7 +182,7 @@ func TestNewClient_EndpointWiring(t *testing.T) {
 	// enables path-style addressing. We only check construction — the endpoint is
 	// exercised on the first real API call.
 	t.Setenv("FORGE_AWS_ENDPOINT", "http://localhost:19566")
-	client, region, err := newClient(context.Background(), Config{
+	client, region, _, err := newClient(context.Background(), Config{
 		AppName:   "app",
 		Stage:     "test",
 		AWSRegion: "us-east-1",

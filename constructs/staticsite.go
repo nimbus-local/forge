@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	forge "github.com/nimbus-local/forge"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudfront"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudfront"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -93,12 +93,7 @@ func NewStaticSite(ctx *forge.RunContext, name string, args *StaticSiteArgs) *St
 		runShellCmd(args.Build, buildDir, args.Environment, name+": build")
 	}
 
-	outputDir := args.OutputDir
-	if !filepath.IsAbs(outputDir) {
-		abs, err := filepath.Abs(outputDir)
-		panicOnErr(err, name+": resolve output dir")
-		outputDir = abs
-	}
+	outputDir := resolvePath(ctx, args.OutputDir)
 
 	pctx := ctx.Pulumi()
 	const originID = "s3-assets"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	forge "github.com/nimbus-local/forge"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/ssm"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ssm"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

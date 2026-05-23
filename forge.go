@@ -10,6 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/nimbus-local/forge/internal/pulumibundle"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
@@ -50,6 +53,10 @@ type CloudflareConfig struct {
 // RemovalPolicy controls what happens to resources when a stage is torn down.
 type RemovalPolicy string
 
+// PulumiVersion is the Pulumi CLI version bundled and managed by forge.
+// Update this alongside the pulumi/sdk/v3 dependency in go.mod.
+const PulumiVersion = "3.243.0"
+
 const (
 	RemovalDestroy            RemovalPolicy = "destroy"
 	RemovalRetain             RemovalPolicy = "retain"
@@ -76,6 +83,8 @@ type RunContext struct {
 	pulumiCtx   *pulumi.Context
 	Stage       string
 	App         *AppConfig
+	AccountID   string // AWS account ID — used to ensure globally unique resource names
+	WorkDir     string // absolute path to the infra/ directory at deploy time
 	DevMode     bool
 	IsProtected bool
 	stageTags   map[string]string
@@ -202,12 +211,26 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 	stackName := auto.FullyQualifiedStackName("organization", cfg.App.Name, stage)
 	devMode := action == "dev"
 
+	accountID, err := resolveAccountID(ctx, stageCfg)
+	if err != nil {
+		return fmt.Errorf("resolve AWS account ID: %w", err)
+	}
+
+	// Capture CWD before Pulumi chdir's to its workspace temp directory.
+	// Constructs use this to resolve relative file paths (e.g. Code zip files).
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
 	// Build the inline Pulumi program from the user's Run func.
 	pulumiProg := func(pulumiCtx *pulumi.Context) error {
 		runCtx := &RunContext{
 			pulumiCtx:   pulumiCtx,
 			Stage:       stage,
 			App:         cfg.App,
+			AccountID:   accountID,
+			WorkDir:     workDir,
 			DevMode:     devMode,
 			IsProtected: stageCfg != nil && stageCfg.Protected,
 			stageTags:   stageCfgTags(stageCfg),
@@ -241,7 +264,7 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 			Name:    tokens.PackageName(cfg.App.Name),
 			Runtime: workspace.NewProjectRuntimeInfo("go", nil),
 			Backend: &workspace.ProjectBackend{
-				URL: stateBackendURL(cfg.App.Name, stage),
+				URL: stateBackendURL(cfg.App.Name, stage, accountID),
 			},
 		}),
 		auto.EnvVars(workspaceEnv),
@@ -319,7 +342,7 @@ func resolvePulumiCommand() (auto.PulumiCommand, error) {
 	if err == nil {
 		return cmd, nil
 	}
-	root, err := pulumibundle.EnsureDir()
+	root, err := pulumibundle.EnsureDir(PulumiVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -328,12 +351,35 @@ func resolvePulumiCommand() (auto.PulumiCommand, error) {
 
 // stateBackendURL returns an S3 URL for Pulumi state storage.
 // The bucket is tagged and created automatically by forge on first deploy.
-func stateBackendURL(appName, stage string) string {
+// FORGE_STATE_BUCKET overrides the default name entirely.
+func stateBackendURL(appName, stage, accountID string) string {
 	bucket := os.Getenv("FORGE_STATE_BUCKET")
 	if bucket != "" {
 		return "s3://" + bucket
 	}
-	return fmt.Sprintf("s3://%s-%s-forge-state", appName, stage)
+	return fmt.Sprintf("s3://%s-%s-forge-state-%s", appName, stage, accountID)
+}
+
+// resolveAccountID calls STS GetCallerIdentity to obtain the AWS account ID.
+// This ensures S3 bucket names are globally unique across AWS accounts.
+func resolveAccountID(ctx context.Context, stageCfg *StageConfig) (string, error) {
+	opts := []func(*awsconfig.LoadOptions) error{}
+	if stageCfg != nil && stageCfg.AWSProfile != "" {
+		opts = append(opts, awsconfig.WithSharedConfigProfile(stageCfg.AWSProfile))
+	}
+	if stageCfg != nil && stageCfg.AWSRegion != "" {
+		opts = append(opts, awsconfig.WithRegion(stageCfg.AWSRegion))
+	}
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return "", err
+	}
+	stsClient := sts.NewFromConfig(awsCfg)
+	out, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(out.Account), nil
 }
 
 func envOrDefault(key, def string) string {

@@ -54,3 +54,7 @@ next-env.d.ts
 # Compiled binaries (e.g. forge-stub built locally)
 forge-stub
 
+# Lambda deployment packages
+*.zip
+/bootstrap
+

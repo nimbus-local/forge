@@ -61,7 +61,7 @@ If your project was deployed with SST v3 Ion, its Pulumi state is stored in an S
 Point forge at the existing bucket:
 
 ```bash
-export FORGE_STATE_BUCKET=my-app-dev-forge-state
+export FORGE_STATE_BUCKET=my-app-dev-forge-state-123456789012
 forge diff   # should show zero changes if the migration was correct
 ```
 
