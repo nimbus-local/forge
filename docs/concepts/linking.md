@@ -23,7 +23,7 @@ When a `Function` is created with `Link: []forge.Linkable{...}`, forge merges ev
 
 ```go
 table  := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-    PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+    PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
 })
 bucket := constructs.NewBucket(ctx, "Uploads", nil)
 queue  := constructs.NewQueue(ctx, "Jobs", nil)

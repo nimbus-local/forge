@@ -5,7 +5,7 @@ import (
 
 	cf "github.com/pulumi/pulumi-cloudflare/sdk/v5/go/cloudflare"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/sst-go/forge"
+	forge "github.com/nimbus-local/forge"
 )
 
 // R2BucketArgs configures a Cloudflare R2 bucket construct.

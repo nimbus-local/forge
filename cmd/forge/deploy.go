@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/sst-go/forge/internal/bootstrap"
+	"github.com/nimbus-local/forge/internal/bootstrap"
 )
 
 // ── forge deploy ───────────────────────────────────────────────────────────────

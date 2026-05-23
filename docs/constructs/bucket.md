@@ -3,7 +3,7 @@
 Creates an S3 bucket. Public access is blocked by default.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 bucket := constructs.NewBucket(ctx, "Uploads", nil)
 ```

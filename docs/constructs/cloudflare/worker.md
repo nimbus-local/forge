@@ -3,7 +3,7 @@
 Creates a Cloudflare Workers script from a JS/TS entry point or a Go package compiled to WASM.
 
 ```go
-import cf "github.com/sst-go/forge/constructs/cloudflare"
+import cf "github.com/nimbus-local/forge/constructs/cloudflare"
 
 worker := cf.NewWorker(ctx, "Api", &cf.WorkerArgs{
     Handler: "worker/index.ts",

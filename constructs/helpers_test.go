@@ -3,7 +3,7 @@ package constructs
 import (
 	"testing"
 
-	forge "github.com/sst-go/forge"
+	forge "github.com/nimbus-local/forge"
 )
 
 func TestQualifiedName(t *testing.T) {

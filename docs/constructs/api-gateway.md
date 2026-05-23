@@ -3,7 +3,7 @@
 Creates an AWS API Gateway HTTP API (v2) with a default stage and auto-deploy enabled.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 api := constructs.NewApiGatewayV2(ctx, "Api", nil)
 api.Route("GET /", &constructs.RouteArgs{Function: fn})

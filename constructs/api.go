@@ -8,7 +8,7 @@ import (
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/sst-go/forge"
+	forge "github.com/nimbus-local/forge"
 )
 
 // ApiGatewayV2 creates an AWS HTTP API (API Gateway v2) with routes backed by

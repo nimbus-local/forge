@@ -3,7 +3,7 @@
 Creates a Cloudflare Workers KV namespace.
 
 ```go
-import cf "github.com/sst-go/forge/constructs/cloudflare"
+import cf "github.com/nimbus-local/forge/constructs/cloudflare"
 
 kv := cf.NewKVNamespace(ctx, "Sessions", nil)
 ```

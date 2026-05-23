@@ -75,13 +75,13 @@ Value: <any stable string — you choose it once and keep it>
     cache: true
 
 - name: Install forge
-  run: go install github.com/sst-go/forge/cmd/forge@latest
+  run: go install github.com/nimbus-local/forge/cmd/forge@latest
 ```
 
 Or pin to a specific version:
 
 ```yaml
-- run: go install github.com/sst-go/forge/cmd/forge@v0.3.0
+- run: go install github.com/nimbus-local/forge/cmd/forge@v0.3.0
 ```
 
 ---
@@ -116,7 +116,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
-      - run: go install github.com/sst-go/forge/cmd/forge@latest
+      - run: go install github.com/nimbus-local/forge/cmd/forge@latest
 
       - name: Deploy to prod
         run: forge deploy --stage prod
@@ -158,7 +158,7 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
-      - run: go install github.com/sst-go/forge/cmd/forge@latest
+      - run: go install github.com/nimbus-local/forge/cmd/forge@latest
       - run: forge deploy --stage staging
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
@@ -177,7 +177,7 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
-      - run: go install github.com/sst-go/forge/cmd/forge@latest
+      - run: go install github.com/nimbus-local/forge/cmd/forge@latest
       - run: forge deploy --stage prod
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
@@ -224,7 +224,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
-      - run: go install github.com/sst-go/forge/cmd/forge@latest
+      - run: go install github.com/nimbus-local/forge/cmd/forge@latest
 
       - name: Bootstrap state bucket
         run: forge bootstrap --stage $STAGE
@@ -285,7 +285,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
-      - run: go install github.com/sst-go/forge/cmd/forge@latest
+      - run: go install github.com/nimbus-local/forge/cmd/forge@latest
 
       - name: Tear down preview
         run: forge remove --stage $STAGE

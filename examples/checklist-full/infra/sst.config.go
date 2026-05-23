@@ -5,8 +5,8 @@ import (
 
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/sst-go/forge"
-	"github.com/sst-go/forge/constructs"
+	forge "github.com/nimbus-local/forge"
+	"github.com/nimbus-local/forge/constructs"
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	forge "github.com/sst-go/forge"
+	forge "github.com/nimbus-local/forge"
 )
 
 // qualifiedName returns "<appName>-<stage>-<name>" so resources are namespaced per stage.

@@ -3,7 +3,7 @@
 Creates an EventBridge Scheduler schedule that invokes a Lambda function on a fixed schedule.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 constructs.NewCron(ctx, "Cleanup", &constructs.CronArgs{
     Schedule: "rate(1 hour)",

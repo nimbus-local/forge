@@ -160,8 +160,8 @@ See [concepts/linking.md](concepts/linking.md) for details.
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {
@@ -181,7 +181,7 @@ func main() {
         },
         Run: func(ctx *forge.RunContext) error {
             table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
             })
 
             fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/sst-go/forge/migrate"
+	"github.com/nimbus-local/forge/migrate"
 )
 
 var migrateCmd = &cobra.Command{
@@ -66,7 +66,7 @@ A go.mod for the infra module is also created if missing.`,
 
 go 1.22
 
-require github.com/sst-go/forge v0.1.0
+require github.com/nimbus-local/forge v0.1.0
 `, appName)
 			if err := os.WriteFile(goModPath, []byte(goMod), 0644); err != nil {
 				return fmt.Errorf("write go.mod: %w", err)

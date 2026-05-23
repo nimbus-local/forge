@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.83.3
 	github.com/pulumi/pulumi/sdk/v3 v3.175.0
-	github.com/sst-go/forge v0.0.0
+	github.com/nimbus-local/forge v0.0.0
 )
 
 require (
@@ -96,4 +96,4 @@ require (
 	lukechampine.com/frand v1.4.2 // indirect
 )
 
-replace github.com/sst-go/forge => ../../..
+replace github.com/nimbus-local/forge => ../../..

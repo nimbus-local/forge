@@ -53,10 +53,10 @@ export CLOUDFLARE_ACCOUNT_ID=your-account-id
 
 ## Available constructs
 
-Import from `github.com/sst-go/forge/constructs/cloudflare`:
+Import from `github.com/nimbus-local/forge/constructs/cloudflare`:
 
 ```go
-import cf "github.com/sst-go/forge/constructs/cloudflare"
+import cf "github.com/nimbus-local/forge/constructs/cloudflare"
 ```
 
 | Construct | Description |
@@ -109,7 +109,7 @@ Use `WorkerArgs.Link` to inject AWS resource identifiers (ARNs, URLs, names) as 
 ```go
 api   := constructs.NewApiGatewayV2(ctx, "Api", nil)
 table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-    PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+    PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
 })
 
 worker := cf.NewWorker(ctx, "Frontend", &cf.WorkerArgs{
@@ -199,9 +199,9 @@ The Go toolchain must be in `PATH`. The compiled WASM binary is uploaded as a `W
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
-    cf "github.com/sst-go/forge/constructs/cloudflare"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
+    cf "github.com/nimbus-local/forge/constructs/cloudflare"
 )
 
 func main() {
@@ -216,7 +216,7 @@ func main() {
         Run: func(ctx *forge.RunContext) error {
             // AWS backend
             table := constructs.NewDynamoDB(ctx, "Orders", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "id"},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "id"},
             })
             api := constructs.NewApiGatewayV2(ctx, "Api", nil)
             api.Route("GET /orders", &constructs.RouteArgs{

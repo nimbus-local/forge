@@ -3,7 +3,7 @@
 Creates an SNS topic with optional Lambda subscribers.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 topic := constructs.NewTopic(ctx, "Events", nil)
 ```

@@ -11,7 +11,7 @@ import (
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudfront"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	forge "github.com/sst-go/forge"
+	forge "github.com/nimbus-local/forge"
 )
 
 // StaticSite serves a pre-built static website from S3 via CloudFront.

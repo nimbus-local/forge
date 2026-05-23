@@ -3,7 +3,7 @@
 Serves a pre-built static website from S3 via CloudFront. Suitable for Vite, Create React App, Hugo, Astro, Gatsby, and any framework that outputs a static `dist/` directory.
 
 ```go
-import "github.com/sst-go/forge/constructs"
+import "github.com/nimbus-local/forge/constructs"
 
 site := constructs.NewStaticSite(ctx, "Web", &constructs.StaticSiteArgs{
     Build:     "npm run build",
@@ -124,8 +124,8 @@ After deploy, create a CNAME in your DNS provider pointing `www.example.com` to 
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {

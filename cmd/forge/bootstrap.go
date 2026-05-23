@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/sst-go/forge/internal/bootstrap"
+	"github.com/nimbus-local/forge/internal/bootstrap"
 )
 
 var bootstrapCmd = &cobra.Command{

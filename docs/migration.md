@@ -109,8 +109,8 @@ export default $config({
 package main
 
 import (
-    forge "github.com/sst-go/forge"
-    "github.com/sst-go/forge/constructs"
+    forge "github.com/nimbus-local/forge"
+    "github.com/nimbus-local/forge/constructs"
 )
 
 func main() {
@@ -125,7 +125,7 @@ func main() {
         },
         Run: func(ctx *forge.RunContext) error {
             table := constructs.NewDynamoDB(ctx, "UsersTable", &constructs.DynamoDBArgs{
-                PrimaryIndex: constructs.PrimaryIndex{PartitionKey: "pk"},
+                PrimaryIndex: &constructs.PrimaryIndex{HashKey: "pk"},
             })
 
             fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{

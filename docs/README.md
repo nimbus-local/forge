@@ -70,6 +70,6 @@ forge is a Go-native drop-in replacement for SST (Serverless Stack). It replaces
 
 ## Quick links
 
-- [GitHub](https://github.com/sst-go/forge)
+- [GitHub](https://github.com/nimbus-local/forge)
 - [SST v3 → forge mapping](migration.md#construct-mapping)
 - [CLI reference](getting-started.md#cli-commands)
