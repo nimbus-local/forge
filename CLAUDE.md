@@ -316,7 +316,7 @@ These are working and correct — do not refactor unless a feature explicitly re
 - The `FORGE_MODE` / `FORGE_STAGE` env var dispatch mechanism in `forge.go`
 - The `Linkable` interface (`LinkEnv`/`LinkName` are exported; only forge constructs should implement it)
 - The `qualifiedName()` and `envKey()` naming helpers
-- The SQS-based dev tunnel architecture (do implement the missing stub binary)
+- The SQS-based dev tunnel architecture
 - The SSM path convention (`/forge/<app>/<stage>/<name>`)
 - Cobra CLI structure in `cmd/forge/`
 - Lipgloss styles defined in `cmd/forge/main.go` — use them everywhere
@@ -378,7 +378,9 @@ redirect URL from the request `Host` header. Behind CloudFront + Lambda Function
 - Redirects that send the browser to the raw Lambda URL domain
 - Static asset 404s because `/_next/static/*` only exists on CloudFront/S3
 
-Always use a custom middleware with `getToken`:
+Always use a custom middleware with `getToken`. `NewNextjsSite` sets `x-forwarded-host`
+automatically via a CloudFront viewer-request function, so the correct public domain is
+always available in the request headers:
 
 ```typescript
 // ✅ middleware.ts
@@ -392,8 +394,8 @@ export async function middleware(req: NextRequest) {
     secret: process.env.SST_SECRET_NEXTAUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   })
   if (!token) {
-    const base = process.env.NEXTAUTH_URL ?? req.nextUrl.origin
-    const loginUrl = new URL('/login', base)
+    const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
+    const loginUrl = new URL('/login', `https://${host}`)
     loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
     return NextResponse.redirect(loginUrl)
   }
@@ -401,28 +403,7 @@ export async function middleware(req: NextRequest) {
 }
 ```
 
-**3. `NEXTAUTH_URL` must be set as a Lambda env var.**
-
-Without it, next-auth constructs OAuth callback URLs and sign-in form actions using the
-request origin — which is the Lambda Function URL, not CloudFront. The GitHub OAuth callback
-will fail and clicking "Sign in with GitHub" will do nothing (JS chunk 404s before handlers
-attach). Set it in `NextjsSiteArgs.Environment`:
-
-```go
-site := constructs.NewNextjsSite(ctx, "Web", &constructs.NextjsSiteArgs{
-    Path: "../web",
-    Environment: map[string]string{
-        "NEXTAUTH_URL": "https://<your-cloudfront-or-custom-domain>",
-    },
-    Link: []forge.Linkable{...},
-})
-```
-
-Update this value when adding a custom domain. This is a temporary workaround — the
-permanent fix (roadmap item 8) adds a CloudFront viewer-request function that copies
-`Host` → `x-forwarded-host` automatically.
-
-**4. `authOptions` must declare `pages.signIn`.**
+**3. `authOptions` must declare `pages.signIn`.**
 
 Without it, next-auth redirects unauthenticated users to its built-in `/api/auth/signin`
 page rather than your custom login page. Add to `authOptions`:
@@ -433,11 +414,11 @@ pages: {
 },
 ```
 
-**5. GitHub OAuth app callback URL.**
+**4. GitHub OAuth app callback URL.**
 
 The GitHub OAuth app's "Authorization callback URL" must be:
 ```
-<NEXTAUTH_URL>/api/auth/callback/github
+<url output from forge deploy>/api/auth/callback/github
 ```
 e.g. `https://d6ee090je5y94.cloudfront.net/api/auth/callback/github`. If this does not
 match exactly (including scheme and path), GitHub will reject the OAuth redirect and the
@@ -803,80 +784,11 @@ When `Versioning` is also true, add a noncurrent version expiration rule at `Lif
 
 The state bucket in `internal/bootstrap/bootstrap.go` already has a hardcoded 90-day noncurrent version expiration — leave that as-is.
 
-### 8. NextjsSite: CloudFront Host Header Forwarding
-
-**Problem:** CloudFront forwards requests to the Lambda Function URL with the Lambda URL as the
-`Host` header. The browser's original public hostname (e.g. `d6ee090je5y94.cloudfront.net`) is
-lost. Any server-side code that derives its public URL from the request host — including
-`next-auth/middleware`, `getServerSession`, and any framework that constructs absolute redirect
-URLs — will produce links pointing at the raw Lambda URL. This causes static asset 404s and
-broken OAuth flows because the browser ends up on the wrong domain.
-
-**Fix:** Add a lightweight CloudFront viewer-request function to `NewNextjsSite` that copies the
-`Host` header (which contains the CloudFront domain at the viewer edge) to `x-forwarded-host`
-before the request is forwarded to the Lambda origin:
-
-```go
-hostFwdFn, err := cloudfront.NewFunction(pctx, name+"-host-fwd", &cloudfront.FunctionArgs{
-    Name:    pulumi.String(qualifiedName(ctx, name+"-host-fwd")),
-    Runtime: pulumi.String("cloudfront-js-2.0"),
-    Publish: pulumi.Bool(true),
-    Code: pulumi.String(`function handler(event) {
-  var req = event.request;
-  req.headers["x-forwarded-host"] = { value: req.headers["host"].value };
-  return req;
-}`),
-})
-panicOnErr(err, name+": host-forward function")
-```
-
-Associate it with **both** the default cache behavior (Lambda/SSR) and any Lambda-backed ordered
-behaviors as a `viewer-request` event:
-
-```go
-FunctionAssociations: cloudfront.DistributionDefaultCacheBehaviorFunctionAssociationArray{
-    &cloudfront.DistributionDefaultCacheBehaviorFunctionAssociationArgs{
-        EventType:   pulumi.String("viewer-request"),
-        FunctionArn: hostFwdFn.Arn,
-    },
-},
-```
-
-With `x-forwarded-host` set, Next.js middleware can read the correct public domain:
-
-```typescript
-// middleware.ts — reads x-forwarded-host set by the CloudFront Function
-const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
-const base = `https://${host}`
-```
-
-**Impact:** Users no longer need to hardcode `NEXTAUTH_URL` in their infra config for the
-host-derivation problem. Custom domains work automatically. This matches what SST Ion does in
-their `NextjsSite` construct. Update the checklist-full example's `middleware.ts` and remove
-the `NEXTAUTH_URL` env var from its infra config once this is implemented.
-
-### 9. NextjsSite: Image Optimization Lambda
-
-open-next produces an `image-optimization-function` alongside the SSR Lambda, but
-`NewNextjsSite` currently only deploys the SSR Lambda. Without the image optimization
-function, `/_next/image` requests hit the SSR Lambda and 404, so `next/image` components
-render broken images.
-
-**Fix:**
-1. Deploy `.open-next/image-optimization-function` as a second Lambda (Node.js, arm64).
-2. Add a CloudFront ordered cache behavior for `/_next/image*` pointing at the image
-   optimization Lambda Function URL.
-3. Grant the image Lambda access to the S3 assets bucket for local image optimization.
-
-Until this is implemented, users must set `images: { unoptimized: true }` in
-`next.config.js` to bypass the optimization endpoint. Document this in the construct
-godoc and in `docs/constructs/nextjssite.md`.
-
-### 10. Documentation
+### 8. Documentation
 
 Every exported type, function, method, and constant needs a godoc comment. `docs/` directory with getting-started, migration guide, config reference, per-construct references, and concept guides (stages, linking, secrets, dev-tunnel, state).
 
-### 11. Deploy Output Enhancement
+### 9. Deploy Output Enhancement
 
 Parse `UpResult` and format a clean summary table after deployment showing resource changes (created/updated/deleted) and stack outputs.
 

@@ -78,14 +78,23 @@ iam.NewRolePolicy(ctx.Pulumi(), "web-dynamo-policy", &iam.RolePolicyArgs{
 | `aws.s3.Bucket` | Static asset storage |
 | `aws.s3.BucketPublicAccessBlock` | Block direct public access to S3 |
 | `aws.cloudfront.OriginAccessControl` | Secure S3 ↔ CloudFront (sigv4) |
+| `aws.cloudfront.Function` | Viewer-request function: copies `Host` → `x-forwarded-host` |
 | `aws.iam.Role` | SSR Lambda execution role |
 | `aws.cloudwatch.LogGroup` | Lambda logs (14-day retention) |
 | `aws.lambda.Function` | Node.js 24 SSR handler (arm64) |
 | `aws.lambda.FunctionUrl` | HTTPS endpoint for CloudFront (auth type: NONE) |
 | `aws.lambda.Permission` × 2 | Public invoke access (required for NONE auth) |
+| `aws.iam.Role` _(optional)_ | Image optimisation Lambda execution role |
+| `aws.cloudwatch.LogGroup` _(optional)_ | Image Lambda logs |
+| `aws.lambda.Function` _(optional)_ | Node.js 22 image optimisation handler (arm64) |
+| `aws.lambda.FunctionUrl` _(optional)_ | HTTPS endpoint for image Lambda |
+| `aws.lambda.Permission` × 2 _(optional)_ | Public invoke access for image Lambda |
 | `aws.cloudfront.Distribution` | CDN with S3 + Lambda origins |
 | `aws.s3.BucketPolicy` | Allow CloudFront OAC to read S3 |
 | `aws.s3.BucketObject` × N | One per file in `.open-next/assets/` |
+
+Resources marked _optional_ are only created when open-next produces an
+`image-optimization-function` directory (which it does by default in v3+).
 
 ---
 
@@ -107,6 +116,40 @@ Granting only one causes AWS to show a console warning and requests will be deni
 
 ---
 
+## Host header forwarding
+
+`NewNextjsSite` automatically creates a CloudFront viewer-request function that copies
+the `Host` header (the CloudFront or custom domain visible to the browser) to
+`x-forwarded-host` before each request is forwarded to a Lambda origin.
+
+This means server-side code — including **next-auth** — can derive the correct public
+URL from the request without a hardcoded `NEXTAUTH_URL` environment variable:
+
+```typescript
+// middleware.ts
+const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
+const loginUrl = new URL('/login', `https://${host}`)
+```
+
+Custom domains work automatically; no infra config change is needed when a domain is
+added or changed.
+
+---
+
+## Image optimisation
+
+When open-next builds an `image-optimization-function` directory (the default in
+open-next v3+), forge automatically deploys it as a second Lambda and wires a
+`/_next/image*` CloudFront behaviour to it.
+
+`next/image` components work out of the box with no extra configuration — remove
+any `images: { unoptimized: true }` workaround from your `next.config.js`.
+
+The image Lambda is granted `s3:GetObject` on the assets bucket so it can fetch
+source images for optimisation.
+
+---
+
 ## Build process
 
 On every `forge deploy` (and `forge diff`), forge runs:
@@ -121,8 +164,9 @@ in the project `Path`. The resulting `.open-next/` directory is then deployed:
 | Output | Deployed to |
 |---|---|
 | `.open-next/assets/` | S3 bucket (static files) |
-| `.open-next/server-functions/default/` | Lambda function (open-next v3) |
-| `.open-next/server-function/` | Lambda function (open-next v2 fallback) |
+| `.open-next/server-functions/default/` | SSR Lambda (open-next v3) |
+| `.open-next/server-function/` | SSR Lambda (open-next v2 fallback) |
+| `.open-next/image-optimization-function/` | Image Lambda (when present) |
 
 ---
 
@@ -130,8 +174,9 @@ in the project `Path`. The resulting `.open-next/` directory is then deployed:
 
 | Request path | Routed to | Cache policy |
 |---|---|---|
+| `/_next/image*` | Image optimisation Lambda | `UseOriginCacheControlHeaders` |
 | `/_next/static/*` | S3 | `CachingOptimized` (immutable) |
-| Everything else | Lambda Function URL | `CachingDisabled` (pass-through) |
+| Everything else | SSR Lambda | `CachingDisabled` (pass-through) |
 
 ---
 
@@ -218,8 +263,44 @@ func main() {
 
 ---
 
-## Limitations
+## next-auth / Auth.js integration
 
-- Image optimisation (`next/image` with a remote loader) uses the same SSR Lambda. For high-traffic image workloads, consider an external image CDN.
-- `middleware.ts` edge functions are not deployed to CloudFront edge; they run in the Lambda. Latency-sensitive middleware may benefit from Lambda@Edge (not currently supported by forge).
-- The `Environment` map cannot contain Pulumi output values at build time. Use `Link` to inject dynamic resource identifiers at Lambda runtime.
+With `x-forwarded-host` set automatically by the CloudFront function, configure
+`authOptions` and middleware like this:
+
+```typescript
+// app/api/auth/[...nextauth]/route.ts
+export const authOptions: NextAuthOptions = {
+  providers: [
+    GitHubProvider({
+      clientId: process.env.SST_SECRET_GITHUB_ID!,
+      clientSecret: process.env.SST_SECRET_GITHUB_SECRET!,
+    }),
+  ],
+  secret: process.env.SST_SECRET_NEXTAUTH_SECRET,
+  pages: { signIn: '/login' },
+}
+```
+
+```typescript
+// middleware.ts
+import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const token = await getToken({
+    req,
+    secret: process.env.SST_SECRET_NEXTAUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  })
+  if (!token) {
+    const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
+    const loginUrl = new URL('/login', `https://${host}`)
+    loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
+    return NextResponse.redirect(loginUrl)
+  }
+  return NextResponse.next()
+}
+```
+
+Set the GitHub OAuth app callback URL to `<url output>/api/auth/callback/github`.
