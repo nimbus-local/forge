@@ -2,11 +2,14 @@ package constructs
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/sqs"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -46,6 +49,10 @@ type FunctionArgs struct {
 	// For Go: build with GOARCH=arm64 GOOS=linux go build -o bootstrap, then zip the binary.
 	// If empty, the Lambda is registered without code — deploy code separately (e.g. via CI).
 	Code string
+	// DevHandler is the Go package path (relative to project root) to run locally in dev mode.
+	// Example: "./functions/api". When set, `forge dev` builds this package and routes Lambda
+	// invocations to the local binary via the SQS tunnel instead of running real Lambda code.
+	DevHandler string
 	// KMSKeyArn is the ARN of a customer-managed KMS key used to encrypt the function's
 	// environment variables. A kms:Grant is created automatically for the execution role.
 	// The key policy must also allow the CloudWatch Logs service principal to use the key
@@ -73,6 +80,10 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	}
 	if args.MemorySize == 0 {
 		args.MemorySize = 128
+	}
+
+	if ctx.DevMode {
+		return newFunctionDev(ctx, name, args)
 	}
 
 	pctx := ctx.Pulumi()
@@ -201,3 +212,162 @@ func (f *Function) LinkEnv() pulumi.StringMap {
 
 // LinkName implements Linkable.
 func (f *Function) LinkName() string { return f.name }
+
+// ── Dev mode ──────────────────────────────────────────────────────────────────
+
+// newFunctionDev deploys a forge-stub Lambda that proxies invocations over SQS
+// to the local `forge dev` tunnel. Called by NewFunction when ctx.DevMode is true.
+//
+// Shared SQS request/response queues are created once per stack (via ctx.SetDevQueues)
+// and reused across all dev functions. The function ARN and local handler source path
+// are exported as stack outputs so the CLI can wire up the tunnel.
+func newFunctionDev(ctx *forge.RunContext, name string, args *FunctionArgs) *Function {
+	pctx := ctx.Pulumi()
+
+	// ── IAM role (same as prod) ───────────────────────────────────────────────
+	role, err := iam.NewRole(pctx, name+"-role", &iam.RoleArgs{
+		AssumeRolePolicy: pulumi.String(`{
+			"Version": "2012-10-17",
+			"Statement": [{
+				"Effect": "Allow",
+				"Principal": { "Service": "lambda.amazonaws.com" },
+				"Action": "sts:AssumeRole"
+			}]
+		}`),
+		ManagedPolicyArns: pulumi.StringArray{
+			pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
+		},
+		Tags: defaultTags(ctx, name),
+	})
+	panicOnErr(err, name+": dev iam role")
+
+	// ── CloudWatch log group (same as prod) ───────────────────────────────────
+	logGroupArgs := &cloudwatch.LogGroupArgs{
+		Name: pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name)),
+		Tags: defaultTags(ctx, name),
+	}
+	if r := resolveLogRetention(args.LogRetentionDays); r != 0 {
+		logGroupArgs.RetentionInDays = pulumi.Int(r)
+	}
+	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", logGroupArgs)
+	panicOnErr(err, name+": dev log group")
+
+	// ── Shared dev SQS queues (created once per stack) ────────────────────────
+	reqURL, resURL, queuesExist := ctx.DevQueues()
+	if !queuesExist {
+		reqQ, qErr := sqs.NewQueue(pctx, "forge-dev-req", &sqs.QueueArgs{
+			Name:                     pulumi.Sprintf("%s-%s-forge-dev-req", ctx.App.Name, ctx.Stage),
+			VisibilityTimeoutSeconds: pulumi.Int(30),
+			MessageRetentionSeconds:  pulumi.Int(60),
+		})
+		panicOnErr(qErr, "forge-dev-req queue")
+
+		resQ, qErr := sqs.NewQueue(pctx, "forge-dev-res", &sqs.QueueArgs{
+			Name:                     pulumi.Sprintf("%s-%s-forge-dev-res", ctx.App.Name, ctx.Stage),
+			VisibilityTimeoutSeconds: pulumi.Int(5),
+			MessageRetentionSeconds:  pulumi.Int(60),
+		})
+		panicOnErr(qErr, "forge-dev-res queue")
+
+		ctx.SetDevQueues(reqQ.Url, resQ.Url)
+		reqURL, resURL, _ = ctx.DevQueues()
+	}
+
+	// ── SQS access policy for stub Lambda ─────────────────────────────────────
+	// The stub needs to send to the request queue and poll the response queue.
+	sqsPolicy := pulumi.All(reqURL, resURL).ApplyT(func(vals []interface{}) (string, error) {
+		req := fmt.Sprint(vals[0])
+		res := fmt.Sprint(vals[1])
+		// Convert queue URL to ARN: https://sqs.<region>.amazonaws.com/<account>/<name>
+		// For Nimbus / LocalStack the URL format is identical so we derive the ARN.
+		return fmt.Sprintf(`{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Action": ["sqs:SendMessage"],
+					"Resource": "%s"
+				},
+				{
+					"Effect": "Allow",
+					"Action": ["sqs:ReceiveMessage","sqs:DeleteMessage","sqs:ChangeMessageVisibility"],
+					"Resource": "%s"
+				}
+			]
+		}`, sqsURLtoARN(req), sqsURLtoARN(res)), nil
+	}).(pulumi.StringOutput)
+
+	_, err = iam.NewRolePolicy(pctx, name+"-dev-sqs", &iam.RolePolicyArgs{
+		Role:   role.Name,
+		Policy: sqsPolicy,
+	})
+	panicOnErr(err, name+": dev sqs policy")
+
+	// ── Merge environment variables ───────────────────────────────────────────
+	envVars := pulumi.StringMap{
+		"FORGE_STAGE":              pulumi.String(ctx.Stage),
+		"FORGE_REQUEST_QUEUE_URL":  reqURL,
+		"FORGE_RESPONSE_QUEUE_URL": resURL,
+	}
+	for k, v := range args.Environment {
+		envVars[k] = pulumi.String(v)
+	}
+	for _, link := range args.Link {
+		for k, v := range link.LinkEnv() {
+			envVars[k] = v
+		}
+	}
+
+	// ── Stub Lambda (x86_64 linux, 30 s timeout to match poll window) ─────────
+	fnArgs := &awslambda.FunctionArgs{
+		Name:          pulumi.String(qualifiedName(ctx, name)),
+		Role:          role.Arn,
+		Handler:       pulumi.String("bootstrap"),
+		Runtime:       pulumi.String(RuntimeGo),
+		Architectures: pulumi.StringArray{pulumi.String(ArchX8664)},
+		Timeout:       pulumi.Int(30),
+		MemorySize:    pulumi.Int(128),
+		Environment: &awslambda.FunctionEnvironmentArgs{
+			Variables: envVars,
+		},
+		Tags: defaultTags(ctx, name),
+	}
+	if stubZip := os.Getenv("FORGE_STUB_ZIP"); stubZip != "" {
+		fnArgs.Code = pulumi.NewFileArchive(stubZip)
+	}
+
+	fn, err := awslambda.NewFunction(pctx, name, fnArgs)
+	panicOnErr(err, name+": stub lambda function")
+
+	// ── Export ARN + handler source for the CLI tunnel ────────────────────────
+	pctx.Export("devHandlerArn_"+name, fn.Arn)
+	pctx.Export("devHandlerSrc_"+name, pulumi.String(args.DevHandler))
+
+	return &Function{name: name, resource: fn, role: role, ctx: ctx}
+}
+
+// sqsURLtoARN converts an SQS queue URL to its ARN.
+// URL format: https://sqs.<region>.amazonaws.com/<account>/<name>
+// Also handles Nimbus/LocalStack: http://localhost:4566/000000000000/<name>
+func sqsURLtoARN(url string) string {
+	// Strip scheme and split on /
+	s := url
+	for _, prefix := range []string{"https://", "http://"} {
+		s = strings.TrimPrefix(s, prefix)
+	}
+	parts := strings.SplitN(s, "/", 3)
+	if len(parts) < 3 {
+		return url // can't parse — return as-is
+	}
+	host := parts[0]  // sqs.us-east-1.amazonaws.com or localhost:4566
+	acct := parts[1]  // 123456789012
+	qname := parts[2] // queue-name
+
+	// Derive region from host.
+	region := "us-east-1"
+	hostParts := strings.Split(host, ".")
+	if len(hostParts) >= 4 && hostParts[0] == "sqs" {
+		region = hostParts[1]
+	}
+	return fmt.Sprintf("arn:aws:sqs:%s:%s:%s", region, acct, qname)
+}

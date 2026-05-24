@@ -60,6 +60,10 @@ type Tunnel struct {
 	requestURL  string
 	responseURL string
 	handlers    map[string]string // functionARN → local handler binary path
+
+	// sendFn is called to deliver a response. Defaults to sending via SQS.
+	// Override in tests to capture responses without a real SQS connection.
+	sendFn func(ctx context.Context, resp Response)
 }
 
 // NewTunnel creates a Tunnel from pre-provisioned SQS queue URLs.
@@ -74,12 +78,14 @@ func NewTunnel(requestQueueURL, responseQueueURL string) (*Tunnel, error) {
 			o.BaseEndpoint = aws.String(endpoint)
 		})
 	}
-	return &Tunnel{
+	t := &Tunnel{
 		sqs:         sqs.NewFromConfig(cfg, clientOpts...),
 		requestURL:  requestQueueURL,
 		responseURL: responseQueueURL,
 		handlers:    map[string]string{},
-	}, nil
+	}
+	t.sendFn = t.sendViaSQS
+	return t, nil
 }
 
 // RegisterHandler maps a Lambda function ARN to a local executable path.
@@ -139,6 +145,7 @@ func (t *Tunnel) handle(ctx context.Context, inv *Invocation) {
 	binaryPath, ok := t.handlers[inv.FunctionARN]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "forge dev: no handler registered for %s\n", inv.FunctionARN)
+		t.sendFn(ctx, Response{ID: inv.ID, Error: "no handler registered for " + inv.FunctionARN})
 		return
 	}
 
@@ -155,13 +162,18 @@ func (t *Tunnel) handle(ctx context.Context, inv *Invocation) {
 		fmt.Fprintf(os.Stdout, "  ✓ [%s] invocation handled\n", inv.FunctionARN)
 	}
 
+	t.sendFn(ctx, resp)
+}
+
+// sendViaSQS is the default sendFn — publishes the response to the SQS response queue.
+func (t *Tunnel) sendViaSQS(ctx context.Context, resp Response) {
 	payload, _ := json.Marshal(resp)
-	_, sendErr := t.sqs.SendMessage(ctx, &sqs.SendMessageInput{
+	_, err := t.sqs.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:    aws.String(t.responseURL),
 		MessageBody: aws.String(string(payload)),
 	})
-	if sendErr != nil {
-		fmt.Fprintf(os.Stderr, "forge dev: send response error: %v\n", sendErr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "forge dev: send response error: %v\n", err)
 	}
 }
 
