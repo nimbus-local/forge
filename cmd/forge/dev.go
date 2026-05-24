@@ -54,6 +54,11 @@ func runDev(_ *cobra.Command, _ []string) error {
 	}
 	defer os.Remove(stubZip)
 
+	// ── Bootstrap state bucket (idempotent) ──────────────────────────────────
+	if err := ensureBootstrapped(stage); err != nil {
+		return err
+	}
+
 	// ── Deploy stub Lambdas + shared SQS queues via Pulumi ───────────────────
 	outputFile := filepath.Join(os.TempDir(), "forge-dev-"+stage+".json")
 	defer os.Remove(outputFile)
