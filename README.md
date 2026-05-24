@@ -342,9 +342,9 @@ Testing runs in two tiers: real AWS first to establish ground truth, then [Nimbu
 forge already supports `FORGE_AWS_ENDPOINT` for redirecting Pulumi and all AWS SDK calls to a local emulator.
 This milestone adds structured assertions on top of that.
 
-- [ ] Deploy `examples/smoke` against Nimbus — assert every construct creates resources, link env vars are injected, and the API Gateway route responds correctly
+- [x] Deploy `examples/smoke` against Nimbus — assert every construct creates resources, link env vars are injected, and the API Gateway route responds correctly
 - [ ] Verify `forge dev` tunnel over Nimbus SQS (request/response queues round-trip locally)
-- [ ] CI gate: Nimbus deployment job in GitHub Actions that runs the smoke app on every PR (no AWS account or credentials required)
+- [x] CI gate: Nimbus deployment job in GitHub Actions that runs the smoke app on every PR (no AWS account or credentials required)
 
 ### Phase 3 — Hardening
 

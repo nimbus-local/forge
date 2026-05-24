@@ -2,32 +2,7 @@
 
 Go-native drop-in replacement for SST (Serverless Stack), which entered maintenance mode in 2025. Replaces the TypeScript config layer with native Go and adds a one-command migration path (`forge migrate`).
 
----
-
-## Commands
-
-```bash
-# Build the CLI
-go build ./cmd/forge
-
-# Run all tests
-go test ./...
-
-# Run unit tests only (no integration)
-go test ./... -short
-
-# Run with integration tag (real AWS)
-go test ./... -tags integration
-
-# Run e2e tests against the built binary
-go test ./test/e2e/... -tags e2e
-
-# Test coverage
-go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out
-
-# Install CLI locally
-go install ./cmd/forge
-```
+> Build commands, PR checklist, and contributor setup are in [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
 ---
 
@@ -296,17 +271,6 @@ import (
 - No `log.Fatal` in library code — use `panicOnErr()` or return errors
 - CLI output: use lipgloss styles from `cmd/forge/main.go` (bold, green, red, dim)
 
-### PR checklist (must complete before opening every PR)
-1. `go fmt ./...` passes (no diff)
-2. `go build ./...` passes
-3. `go test ./... -short` passes
-4. New constructs have a `docs/constructs/<name>.md` doc page
-5. `README.md` constructs table updated (top-level project README)
-6. `README.md` roadmap updated — check off completed items
-7. `docs/README.md` concepts/constructs table updated
-8. SST v3 → forge mapping table in `CLAUDE.md` updated
-9. `constructs/` file structure comment in `CLAUDE.md` updated
-
 ---
 
 ## Do Not Change
@@ -429,71 +393,7 @@ sign-in flow will fail with a redirect_uri_mismatch error.
 
 ## Planned Features
 
-Work through in this order (each builds on the previous):
-
-### 1. Bootstrap Command + State Bucket Auto-Creation
-
-**Problem:** First deploy fails if the S3 state bucket doesn't exist.
-
-**Implement `forge bootstrap`:**
-```
-forge bootstrap [--stage <stage>]
-  Creates the Pulumi state S3 bucket if it doesn't exist.
-  Bucket name: <app>-<stage>-forge-state
-  Bucket config: versioning enabled, SSE-S3, public access blocked, lifecycle rule (expire old state after 90 days)
-  Idempotent — safe to run multiple times.
-  Auto-runs at the start of every `forge deploy` if the bucket doesn't exist.
-```
-
-File: `cmd/forge/bootstrap.go`
-Helper: `internal/bootstrap/bootstrap.go` — uses AWS SDK v2 s3 + s3control
-
-The deploy command in `cmd/forge/deploy.go` should call `ensureBootstrapped()` before calling `runConfig("deploy", stage)`. `ensureBootstrapped()` checks if the bucket exists (HeadBucket) and creates it if not.
-
-### 2. Multi-Stage Support
-
-**Current gap:** Stages work but have no per-stage configuration overrides.
-
-Add to `forge.go`:
-```go
-type Config struct {
-    App    *AppConfig
-    Stages map[string]*StageConfig   // NEW
-    Run    func(ctx *RunContext) error
-}
-
-type StageConfig struct {
-    Removal     RemovalPolicy
-    AWSProfile  string
-    AWSRegion   string
-    Protected   bool                   // forge remove requires --force
-    Tags        map[string]string
-}
-```
-
-RunContext additions:
-```go
-type RunContext struct {
-    pulumiCtx   *pulumi.Context
-    Stage       string
-    App         *AppConfig
-    DevMode     bool
-    IsProtected bool
-}
-
-func (r *RunContext) IsProduction() bool { return r.Stage == "production" || r.Stage == "prod" }
-func (r *RunContext) StageIn(stages ...string) bool { ... }
-```
-
-Also add `forge stages` command: lists all deployed stages with last-deployed timestamp, resource count, and protected status.
-
-The `runPulumi()` function must read StageConfig and:
-1. Override `AWS_PROFILE` and `AWS_DEFAULT_REGION` env vars if set
-2. Set `ctx.IsProtected`
-3. Merge StageConfig.Tags into `defaultTags()`
-4. Block `forge remove` if `Protected: true` and `--force` not passed
-
-### 3. Configurable Resource Name Suffix
+### Configurable Resource Name Suffix
 
 Currently all S3 bucket names (state bucket and construct buckets) are suffixed with the
 AWS account ID to guarantee global uniqueness. A future option to override this suffix
@@ -517,51 +417,7 @@ When `BucketSuffix` is set, use it instead of the account ID in both `bucketName
 and `BucketName()` (state bucket). When empty, fall back to the account ID (current behaviour).
 Store the suffix on `RunContext` alongside `AccountID` so constructs can access it.
 
-### 4. Missing AWS Constructs
-
-#### `constructs/cron.go` — EventBridge Scheduler
-```go
-type CronArgs struct {
-    Schedule string   // "rate(5 minutes)" or "cron(0 12 * * ? *)"
-    Job      *FunctionArgs
-    Enabled  bool
-}
-func NewCron(ctx *forge.RunContext, name string, args *CronArgs) *Cron
-```
-Creates: EventBridge Scheduler → Lambda invoke permission + IAM role.
-
-#### `constructs/queue.go` — SQS Queue
-```go
-type QueueArgs struct {
-    Consumer          *FunctionArgs
-    Fifo              bool
-    VisibilityTimeout int   // default 30
-    BatchSize         int   // default 10
-    DeadLetterQueue   bool  // creates DLQ with 3 max receive count
-}
-func NewQueue(ctx *forge.RunContext, name string, args *QueueArgs) *Queue
-// LinkEnv: SST_QUEUE_<NAME>_URL, SST_QUEUE_<NAME>_ARN
-```
-
-#### `constructs/topic.go` — SNS Topic
-```go
-type TopicArgs struct {
-    Subscribers []*FunctionArgs
-    FIFO        bool
-}
-func NewTopic(ctx *forge.RunContext, name string, args *TopicArgs) *Topic
-// LinkEnv: SST_TOPIC_<NAME>_ARN
-```
-
-#### `constructs/secret.go` — Managed Secret Reference
-```go
-// Secret fetches an SSM SecureString at deploy time and injects it into linked Lambdas.
-// LinkEnv: SST_SECRET_<NAME> = <resolved value>
-type SecretArgs struct {
-    Default string   // WARNING: stored in Pulumi state — non-sensitive defaults only
-}
-func NewSecret(ctx *forge.RunContext, name string, args *SecretArgs) *Secret
-```
+### Missing AWS Constructs
 
 #### `constructs/cognito.go` — Cognito User Pool
 ```go
@@ -618,180 +474,12 @@ A magic link flow needs `NewEmail` for sending plus application code in a Lambda
 `NewDynamoDB` + `NewEmail` + `NewFunction` + `NewApiGatewayV2` is the complete
 infrastructure for a magic link auth system. No additional construct needed.
 
-### 4. Tests
+### Remaining roadmap items
 
-#### Unit tests — `migrate/converter_test.go`
-```go
-func TestConvertFunction(t *testing.T)
-func TestConvertApiGatewayV2(t *testing.T)
-func TestConvertDynamoDB(t *testing.T)
-func TestConvertBucket(t *testing.T)
-func TestConvertRemovalPolicy(t *testing.T)
-func TestConvertAppConfig(t *testing.T)
-func TestConvertLinks(t *testing.T)
-func TestConvertExports(t *testing.T)
-func TestRoundTrip(t *testing.T)
-```
-
-Use `testdata/` with `.ts` input files and `.go.golden` expected outputs.
-
-#### Unit tests — `secrets/manager_test.go`
-Mock the SSM client with an interface. Cover Set, Get, Remove, List, LoadAll, and not-found error.
-
-#### Unit tests — `constructs/helpers_test.go`
-Cover `qualifiedName`, `envKey` (camelCase/kebab → SCREAMING_SNAKE), and `defaultTags`.
-
-#### Unit tests — `internal/bootstrap/bootstrap_test.go`
-Mock the S3 client. Test bucket creation and idempotency.
-
-#### Integration tests — `test/integration/`
-Tag `//go:build integration`. Deploy a minimal stack to a real AWS account, verify outputs, tear down.
-
-```go
-func MustDeploy(t *testing.T, cfg *forge.Config, stage string) map[string]auto.OutputMap
-func MustRemove(t *testing.T, cfg *forge.Config, stage string)
-func TestStage(t *testing.T) string  // returns "test-" + random suffix
-```
-
-#### E2E CLI tests — `test/e2e/`
-Test the actual `forge` binary (tag `//go:build e2e`):
-```go
-func TestForgeDeploy(t *testing.T)
-func TestForgeDiff(t *testing.T)
-func TestForgeMigrate(t *testing.T)
-func TestForgeSecretSetGet(t *testing.T)
-```
-
-Testing rules:
-- `t.Parallel()` in all unit tests
-- Mock AWS SDK clients via interfaces — never make real AWS calls in unit tests
-- Integration tests must clean up with `defer remove`
-- Target 70%+ coverage on `migrate/`, `secrets/`, `internal/bootstrap/`
-
-### 5. Cloudflare Support
-
-Add `constructs/cloudflare/` with Worker, KV, D1, and R2 constructs. Add `go.mod` dependency on `github.com/pulumi/pulumi-cloudflare/sdk/v5/go/cloudflare`.
-
-AppConfig gains:
-```go
-type AppConfig struct {
-    Name       string
-    Home       string              // "aws" | "cloudflare" | "aws+cloudflare"
-    Removal    RemovalPolicy
-    Cloudflare *CloudflareConfig
-}
-type CloudflareConfig struct {
-    AccountID string   // defaults to CLOUDFLARE_ACCOUNT_ID
-    ZoneID    string   // defaults to CLOUDFLARE_ZONE_ID
-}
-```
-
-When `Home` includes "cloudflare", `runPulumi()` installs the Cloudflare plugin. Check for `CLOUDFLARE_API_TOKEN` (preferred) or `CLOUDFLARE_API_KEY`+`CLOUDFLARE_EMAIL` and give a helpful error if missing.
-
-Worker construct compiles Go to WASM (`GoHandler`) or bundles JS/TS via esbuild (`Handler`). KV, D1, and R2 inject namespace IDs as Lambda env bindings.
-
-### 6. Project Templates (`forge create`)
-
-```
-forge create <project-name> [--template <template>]
-```
-
-Templates under `templates/`: `go-api`, `go-crud`, `go-worker`, `fullstack`. Each has a `template.yaml` with variable definitions.
-
-Implementation in `cmd/forge/create.go`:
-1. Embed all templates with `//go:embed templates/**`
-2. Prompt for variables using `bufio.Scanner` (no external prompt lib)
-3. Execute `.tmpl` files via `text/template`, strip `.tmpl` extension
-4. Run `go mod tidy` in each module dir
-5. Print next steps
-
-### 7. KMS Encryption + Configurable Retention
-
-#### `constructs/kms.go` — KMS Key
-
-A managed KMS key construct that can be attached to any resource requiring encryption at rest.
-
-```go
-type KMSKeyArgs struct {
-    // Description is a human-readable description of the key's purpose.
-    Description string
-    // EnableRotation enables automatic annual key rotation. Defaults to true.
-    EnableRotation bool
-    // DeletionWindowInDays is the waiting period before key deletion (7–30). Defaults to 30.
-    DeletionWindowInDays int
-}
-func NewKMSKey(ctx *forge.RunContext, name string, args *KMSKeyArgs) *KMSKey
-// LinkEnv: SST_KMS_<NAME>_ARN, SST_KMS_<NAME>_ID
-```
-
-Creates: KMS symmetric key with key policy granting the account full access. Rotation enabled by default.
-
-The key ARN is exposed so it can be passed to other constructs via a `KMSKeyArn string` field:
-
-```go
-key := constructs.NewKMSKey(ctx, "DataKey", nil)
-
-// S3 bucket encrypted with the key
-bucket := constructs.NewBucket(ctx, "Uploads", &constructs.BucketArgs{
-    KMSKeyArn: key.ARN(),
-})
-
-// Lambda log group encrypted with the key
-fn := constructs.NewFunction(ctx, "Api", &constructs.FunctionArgs{
-    KMSKeyArn: key.ARN(),   // encrypts both the function env vars and its log group
-})
-
-// DynamoDB table encrypted with the key
-table := constructs.NewDynamoDB(ctx, "Users", &constructs.DynamoDBArgs{
-    KMSKeyArn: key.ARN(),
-})
-```
-
-#### KMS integration per construct
-
-| Construct | Field | What it encrypts |
-|---|---|---|
-| `NewBucket` | `KMSKeyArn pulumi.StringInput` | S3 server-side encryption (SSE-KMS) |
-| `NewFunction` | `KMSKeyArn pulumi.StringInput` | Lambda env var encryption + CloudWatch log group |
-| `NewNextjsSite` | `KMSKeyArn pulumi.StringInput` | SSR Lambda env vars + log group + assets bucket |
-| `NewDynamoDB` | `KMSKeyArn pulumi.StringInput` | DynamoDB SSE-KMS (replaces default AWS-owned key) |
-| `NewQueue` | `KMSKeyArn pulumi.StringInput` | SQS message encryption |
-| `NewTopic` | `KMSKeyArn pulumi.StringInput` | SNS message encryption |
-| Secrets (SSM) | automatic | SecureString params already use SSM-managed KMS; optionally accept a custom key ARN |
-
-When `KMSKeyArn` is set, the construct must also grant `kms:GenerateDataKey`, `kms:Decrypt`, and `kms:DescribeKey` to whichever IAM principal needs it (Lambda execution role, CloudWatch Logs service, SNS, SQS). Add these grants automatically inside each constructor using `aws.kms.NewGrant` or an inline key policy statement.
-
-#### Configurable CloudWatch log retention
-
-Currently hardcoded to 14 days in `NewFunction` and `NewNextjsSite`. Add `LogRetentionDays int` to both args structs:
-
-```go
-// FunctionArgs and NextjsSiteArgs
-LogRetentionDays int  // 0 = use default (14). Set to -1 to never expire.
-```
-
-Valid values match the CloudWatch API: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653. Any other non-zero value panics with a helpful message listing valid options.
-
-#### Configurable S3 object lifecycle
-
-Add `LifecycleDays int` to `BucketArgs`:
-
-```go
-// BucketArgs
-LifecycleDays int  // 0 = no lifecycle rule. When set, expire current objects after N days.
-```
-
-When `Versioning` is also true, add a noncurrent version expiration rule at `LifecycleDays` as well. This covers the common use case of auto-purging old uploads or log exports without manual AWS console work.
-
-The state bucket in `internal/bootstrap/bootstrap.go` already has a hardcoded 90-day noncurrent version expiration — leave that as-is.
-
-### 8. Documentation
-
-Every exported type, function, method, and constant needs a godoc comment. `docs/` directory with getting-started, migration guide, config reference, per-construct references, and concept guides (stages, linking, secrets, dev-tunnel, state).
-
-### 9. Deploy Output Enhancement
-
-Parse `UpResult` and format a clean summary table after deployment showing resource changes (created/updated/deleted) and stack outputs.
+- `forge dev` tunnel verification over Nimbus SQS (request/response queues round-trip locally)
+- Aurora / RDS construct (`NewDatabase`) — RDS Postgres/MySQL + connection string injection
+- ElastiCache construct (`NewCache`) — Redis/Valkey cluster + connection string injection
+- Drift detection — `forge drift` compares live AWS state against Pulumi state
 
 ---
 
@@ -811,9 +499,8 @@ github.com/spf13/cobra v1.8.0
 ```
 
 Pending:
-- `github.com/aws/aws-sdk-go-v2/service/s3` — bootstrap feature
-- `github.com/pulumi/pulumi-cloudflare/sdk/v5/go/cloudflare` — Cloudflare feature
-- Templates use stdlib `text/template` and `embed` only
+- `github.com/aws/aws-sdk-go-v2/service/rds` — Aurora/RDS construct
+- `github.com/aws/aws-sdk-go-v2/service/elasticache` — ElastiCache construct
 
 ---
 
