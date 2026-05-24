@@ -5,11 +5,13 @@ package forge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -89,6 +91,12 @@ type RunContext struct {
 	DevMode     bool
 	IsProtected bool
 	stageTags   map[string]string
+
+	// dev tunnel state — managed by constructs.NewFunction in dev mode
+	devQueuesMu  sync.Mutex
+	devQueuesSet bool
+	devReqURL    pulumi.StringOutput
+	devResURL    pulumi.StringOutput
 }
 
 // IsProduction returns true when the active stage is "production" or "prod".
@@ -113,6 +121,29 @@ func (r *RunContext) ExtraTags() map[string]string {
 
 // Pulumi returns the underlying pulumi.Context for advanced use cases.
 func (r *RunContext) Pulumi() *pulumi.Context { return r.pulumiCtx }
+
+// SetDevQueues stores the shared SQS queue URLs for the dev tunnel and exports them
+// as stack outputs. Called by constructs.NewFunction on the first dev-mode function.
+// Subsequent calls are no-ops.
+func (r *RunContext) SetDevQueues(reqURL, resURL pulumi.StringOutput) {
+	r.devQueuesMu.Lock()
+	defer r.devQueuesMu.Unlock()
+	if r.devQueuesSet {
+		return
+	}
+	r.devReqURL = reqURL
+	r.devResURL = resURL
+	r.devQueuesSet = true
+	r.pulumiCtx.Export("devQueueReqUrl", reqURL)
+	r.pulumiCtx.Export("devQueueResUrl", resURL)
+}
+
+// DevQueues returns the shared SQS queue URLs set by the first dev-mode NewFunction.
+func (r *RunContext) DevQueues() (reqURL, resURL pulumi.StringOutput, ok bool) {
+	r.devQueuesMu.Lock()
+	defer r.devQueuesMu.Unlock()
+	return r.devReqURL, r.devResURL, r.devQueuesSet
+}
 
 // NewRunContext constructs a RunContext suitable for testing infrastructure programs.
 // Pass the *pulumi.Context received inside a pulumi.RunErr callback that uses pulumi.WithMocks.
@@ -322,11 +353,19 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		return upErr
 
 	case "dev":
-		_, err = stack.Up(ctx,
+		res, devErr := stack.Up(ctx,
 			optup.ProgressStreams(os.Stdout),
 			optup.ErrorProgressStreams(os.Stderr),
 		)
-		return err
+		if devErr != nil {
+			return devErr
+		}
+		if f := os.Getenv("FORGE_DEV_OUTPUT_FILE"); f != "" {
+			if err := writeDevOutputs(res.Outputs, f); err != nil {
+				return fmt.Errorf("write dev outputs: %w", err)
+			}
+		}
+		return nil
 
 	case "destroy":
 		res, destroyErr := stack.Destroy(ctx,
@@ -545,4 +584,57 @@ func stageCfgTags(s *StageConfig) map[string]string {
 		return nil
 	}
 	return s.Tags
+}
+
+// ── Dev tunnel output ─────────────────────────────────────────────────────────
+
+// DevOutputFile is the JSON structure written to FORGE_DEV_OUTPUT_FILE after a
+// successful dev-mode deploy. The CLI reads it to start the local tunnel.
+type DevOutputFile struct {
+	RequestQueueURL  string                `json:"requestQueueUrl"`
+	ResponseQueueURL string                `json:"responseQueueUrl"`
+	Handlers         map[string]DevHandler `json:"handlers"`
+}
+
+// DevHandler holds the resolved ARN and local source path for one function.
+type DevHandler struct {
+	ARN        string `json:"arn"`
+	HandlerSrc string `json:"handlerSrc"`
+}
+
+// writeDevOutputs serialises dev tunnel info from Pulumi stack outputs to path.
+// Output keys written by constructs.NewFunction in dev mode:
+//
+//	devQueueReqUrl          — request SQS queue URL
+//	devQueueResUrl          — response SQS queue URL
+//	devHandlerArn_<Name>    — function ARN for construct <Name>
+//	devHandlerSrc_<Name>    — DevHandler source path for construct <Name>
+func writeDevOutputs(outputs auto.OutputMap, path string) error {
+	out := DevOutputFile{Handlers: map[string]DevHandler{}}
+
+	if v, ok := outputs["devQueueReqUrl"]; ok {
+		out.RequestQueueURL = fmt.Sprint(v.Value)
+	}
+	if v, ok := outputs["devQueueResUrl"]; ok {
+		out.ResponseQueueURL = fmt.Sprint(v.Value)
+	}
+
+	for k, v := range outputs {
+		if name, ok := strings.CutPrefix(k, "devHandlerArn_"); ok {
+			h := out.Handlers[name]
+			h.ARN = fmt.Sprint(v.Value)
+			out.Handlers[name] = h
+		}
+		if name, ok := strings.CutPrefix(k, "devHandlerSrc_"); ok {
+			h := out.Handlers[name]
+			h.HandlerSrc = fmt.Sprint(v.Value)
+			out.Handlers[name] = h
+		}
+	}
+
+	data, err := json.Marshal(out)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0600)
 }

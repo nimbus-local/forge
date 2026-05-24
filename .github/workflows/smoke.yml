@@ -73,6 +73,10 @@ jobs:
 
       # ── Build ─────────────────────────────────────────────────────────────────
 
+      # Verify the stub compiles for linux/amd64 (used by `forge dev`).
+      - name: Verify forge-stub compiles
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/forge-stub/
+
       - name: Build forge CLI
         run: go build -o forge ./cmd/forge
 
@@ -120,6 +124,53 @@ jobs:
         # masking the real failure above.
         continue-on-error: true
         run: ../../forge remove --stage ci
+
+      # ── Dev tunnel smoke ──────────────────────────────────────────────────────
+      # Run `forge dev` against a separate stage (ci-dev) to verify:
+      #   - forge-stub is cross-compiled and deployed correctly
+      #   - shared SQS dev queues are created
+      #   - stub Lambda env vars contain FORGE_REQUEST_QUEUE_URL
+      # The tunnel sits idle (Nimbus doesn't invoke Lambda), so we kill it
+      # after the deployment completes.
+
+      - name: Seed AppSecret for dev stage
+        run: |
+          aws ssm put-parameter \
+            --name /forge/forge-smoke/ci-dev/AppSecret \
+            --value "smoke-default" \
+            --type SecureString \
+            --overwrite
+
+      - name: Run forge dev (background deploy)
+        working-directory: examples/smoke
+        run: |
+          ../../forge dev --stage ci-dev 2>&1 | tee /tmp/forge-dev.log &
+          echo $! > /tmp/forge-dev.pid
+          # Wait up to 3 minutes for "Tunnel active" indicating deploy finished.
+          for i in $(seq 90); do
+            if grep -q "Tunnel active" /tmp/forge-dev.log 2>/dev/null; then
+              echo "Dev tunnel is active."
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Assert dev queues and stub env vars
+        if: always()
+        run: .github/scripts/smoke-assert-dev.sh
+
+      - name: Stop forge dev and remove dev stack
+        if: always()
+        run: |
+          kill "$(cat /tmp/forge-dev.pid 2>/dev/null)" 2>/dev/null || true
+        working-directory: examples/smoke
+        continue-on-error: true
+
+      - name: Remove dev smoke stack
+        if: always()
+        working-directory: examples/smoke
+        continue-on-error: true
+        run: ../../forge remove --stage ci-dev
 
       - name: Stop Nimbus
         if: always()

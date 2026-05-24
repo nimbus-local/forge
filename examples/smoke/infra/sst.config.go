@@ -64,6 +64,7 @@ func main() {
 			handlerArgs := &constructs.FunctionArgs{
 				Handler:          "bootstrap",
 				Code:             "../functions/handler.zip",
+				DevHandler:       "./functions/handler",
 				Link:             []forge.Linkable{table, bucket, secret, key},
 				KMSKeyArn:        key.ARN(),
 				LogRetentionDays: 30,

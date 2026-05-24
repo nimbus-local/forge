@@ -196,6 +196,22 @@ func runTest(t *testing.T, fn func(*forge.RunContext)) *testMocks {
 	return mocks
 }
 
+// runDevTest is like runTest but with DevMode enabled.
+func runDevTest(t *testing.T, fn func(*forge.RunContext)) *testMocks {
+	t.Helper()
+	mocks := newMocks()
+	err := pulumi.RunErr(func(pctx *pulumi.Context) error {
+		ctx := forge.NewRunContext(pctx, testApp, "test", "123456789012")
+		ctx.DevMode = true
+		fn(ctx)
+		return nil
+	}, pulumi.WithMocks("myapp", "test", mocks))
+	if err != nil {
+		t.Fatalf("pulumi.RunErr: %v", err)
+	}
+	return mocks
+}
+
 // assertTag verifies that the resource tags contain the given key.
 func assertTag(t *testing.T, inputs resource.PropertyMap, key string) {
 	t.Helper()
@@ -2090,6 +2106,119 @@ func TestNewNextjsSite_NoKMSByDefault(t *testing.T) {
 	}
 	if mocks.find("aws:s3/bucketServerSideEncryptionConfigurationV2:BucketServerSideEncryptionConfigurationV2") != nil {
 		t.Error("SSE config should not be created without KMSKeyArn")
+	}
+}
+
+// ── NewFunction dev mode tests ────────────────────────────────────────────────
+
+func TestNewFunction_DevMode_DeploysStubLambda(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Handler", &FunctionArgs{
+			Handler:    "bootstrap",
+			Code:       "../functions/handler.zip",
+			DevHandler: "./functions/handler",
+		})
+	})
+
+	r := mocks.find("aws:lambda/function:Function")
+	if r == nil {
+		t.Fatal("stub Lambda function not registered in dev mode")
+	}
+	// Stub uses x86_64 (linux/amd64) architecture.
+	archs := r.inputs["architectures"]
+	if !archs.IsArray() || archs.ArrayValue()[0].StringValue() != "x86_64" {
+		t.Errorf("dev stub should use x86_64, got: %v", archs)
+	}
+}
+
+func TestNewFunction_DevMode_InjectsQueueURLs(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Handler", &FunctionArgs{Handler: "bootstrap"})
+	})
+
+	r := mocks.find("aws:lambda/function:Function")
+	if r == nil {
+		t.Fatal("Lambda function not registered")
+	}
+	assertEnvVar(t, r.inputs, "FORGE_REQUEST_QUEUE_URL")
+	assertEnvVar(t, r.inputs, "FORGE_RESPONSE_QUEUE_URL")
+}
+
+func TestNewFunction_DevMode_CreatesSharedQueues(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		// Two functions → queues created once.
+		NewFunction(ctx, "FnA", &FunctionArgs{Handler: "bootstrap"})
+		NewFunction(ctx, "FnB", &FunctionArgs{Handler: "bootstrap"})
+	})
+
+	queues := mocks.findAll("aws:sqs/queue:Queue")
+	if len(queues) != 2 {
+		t.Errorf("expected 2 dev SQS queues (req + res), got %d", len(queues))
+	}
+}
+
+func TestNewFunction_DevMode_QueueNamesQualified(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{Handler: "bootstrap"})
+	})
+
+	for _, q := range mocks.findAll("aws:sqs/queue:Queue") {
+		name := q.inputs["name"].StringValue()
+		if name != "myapp-test-forge-dev-req" && name != "myapp-test-forge-dev-res" {
+			t.Errorf("unexpected queue name %q", name)
+		}
+	}
+}
+
+func TestNewFunction_DevMode_SQSPolicyCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{Handler: "bootstrap"})
+	})
+
+	if mocks.find("aws:iam/rolePolicy:RolePolicy") == nil {
+		t.Error("SQS IAM role policy not created for dev stub")
+	}
+}
+
+func TestNewFunction_DevMode_LinkEnvStillInjected(t *testing.T) {
+	t.Parallel()
+	link := &testLinkable{
+		name: "MyTable",
+		env: pulumi.StringMap{
+			"SST_TABLE_MY_TABLE_NAME": pulumi.String("myapp-test-MyTable"),
+		},
+	}
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{
+			Handler: "bootstrap",
+			Link:    []forge.Linkable{link},
+		})
+	})
+
+	r := mocks.find("aws:lambda/function:Function")
+	if r == nil {
+		t.Fatal("Lambda function not registered")
+	}
+	assertEnvVar(t, r.inputs, "SST_TABLE_MY_TABLE_NAME")
+}
+
+func TestNewFunction_DevMode_PhysicalNameQualified(t *testing.T) {
+	t.Parallel()
+	mocks := runDevTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Api", &FunctionArgs{Handler: "bootstrap"})
+	})
+
+	r := mocks.find("aws:lambda/function:Function")
+	if r == nil {
+		t.Fatal("Lambda function not registered")
+	}
+	if r.inputs["name"].StringValue() != "myapp-test-Api" {
+		t.Errorf("physical name = %q, want myapp-test-Api", r.inputs["name"].StringValue())
 	}
 }
 
