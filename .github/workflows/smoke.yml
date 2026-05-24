@@ -89,11 +89,11 @@ jobs:
       # NewSecret panics at deploy time if the SSM parameter is missing and no
       # Default is set. Pre-seed it so deploy succeeds without modifying the example.
 
-      - name: Seed SmokeKey secret in SSM
+      - name: Seed AppSecret in SSM
         run: |
           aws ssm put-parameter \
-            --name /forge/forge-smoke/ci/SmokeKey \
-            --value "ci-smoke-secret" \
+            --name /forge/forge-smoke/ci/AppSecret \
+            --value "smoke-default" \
             --type SecureString \
             --overwrite
 
