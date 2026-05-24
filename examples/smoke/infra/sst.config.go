@@ -27,6 +27,10 @@ func main() {
 			Home: "aws",
 		},
 		Run: func(ctx *forge.RunContext) error {
+			// ── KMS key (encrypts all storage + the handler function) ─────────
+
+			key := constructs.NewKMSKey(ctx, "SmokeKey", nil)
+
 			// ── Storage ───────────────────────────────────────────────────────
 
 			table := constructs.NewDynamoDB(ctx, "Records", &constructs.DynamoDBArgs{
@@ -38,23 +42,31 @@ func main() {
 					HashKey:  "pk",
 					RangeKey: "sk",
 				},
+				KMSKeyArn: key.ARN(),
 			})
 
-			bucket := constructs.NewBucket(ctx, "Assets", nil)
+			bucket := constructs.NewBucket(ctx, "Assets", &constructs.BucketArgs{
+				KMSKeyArn:     key.ARN(),
+				LifecycleDays: 90,
+			})
 
 			// ── Secrets ───────────────────────────────────────────────────────
-			// Set before first deploy:
-			//   forge secret set SmokeKey <any-value>
+			// Override with a real value for production:
+			//   forge secret set AppSecret <value>
 
-			secret := constructs.NewSecret(ctx, "SmokeKey", nil)
+			secret := constructs.NewSecret(ctx, "AppSecret", &constructs.SecretArgs{
+				Default: "smoke-default",
+			})
 
 			// ── Handler function args (reused by Queue, Topic, and Cron) ──────
 			// Each construct that receives handlerArgs creates its own Lambda function.
 
 			handlerArgs := &constructs.FunctionArgs{
-				Handler: "bootstrap",
-				Code:    "../functions/handler.zip",
-				Link:    []forge.Linkable{table, bucket, secret},
+				Handler:          "bootstrap",
+				Code:             "../functions/handler.zip",
+				Link:             []forge.Linkable{table, bucket, secret, key},
+				KMSKeyArn:        key.ARN(),
+				LogRetentionDays: 30,
 			}
 
 			// ── API function ──────────────────────────────────────────────────
@@ -71,12 +83,14 @@ func main() {
 				Consumer:          handlerArgs,
 				VisibilityTimeout: 30,
 				DeadLetterQueue:   true,
+				KMSKeyArn:         key.ARN(),
 			})
 
 			// ── Topic with subscriber ─────────────────────────────────────────
 
 			topic := constructs.NewTopic(ctx, "Alerts", &constructs.TopicArgs{
 				Subscribers: []*constructs.FunctionArgs{handlerArgs},
+				KMSKeyArn:   key.ARN(),
 			})
 
 			// ── Cron job (every 5 minutes) ────────────────────────────────────
@@ -108,6 +122,7 @@ func main() {
 			ctx.Export("topicArn", topic.ARN())
 			ctx.Export("bucketName", bucket.Name())
 			ctx.Export("tableName", table.TableName())
+			ctx.Export("kmsKeyArn", key.ARN())
 			return nil
 		},
 	})
