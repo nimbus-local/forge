@@ -2,32 +2,7 @@
 
 Go-native drop-in replacement for SST (Serverless Stack), which entered maintenance mode in 2025. Replaces the TypeScript config layer with native Go and adds a one-command migration path (`forge migrate`).
 
----
-
-## Commands
-
-```bash
-# Build the CLI
-go build ./cmd/forge
-
-# Run all tests
-go test ./...
-
-# Run unit tests only (no integration)
-go test ./... -short
-
-# Run with integration tag (real AWS)
-go test ./... -tags integration
-
-# Run e2e tests against the built binary
-go test ./test/e2e/... -tags e2e
-
-# Test coverage
-go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out
-
-# Install CLI locally
-go install ./cmd/forge
-```
+> Build commands, PR checklist, and contributor setup are in [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
 ---
 
@@ -295,17 +270,6 @@ import (
 - Unexported helpers: short inline comments
 - No `log.Fatal` in library code — use `panicOnErr()` or return errors
 - CLI output: use lipgloss styles from `cmd/forge/main.go` (bold, green, red, dim)
-
-### PR checklist (must complete before opening every PR)
-1. `go fmt ./...` passes (no diff)
-2. `go build ./...` passes
-3. `go test ./... -short` passes
-4. New constructs have a `docs/constructs/<name>.md` doc page
-5. `README.md` constructs table updated (top-level project README)
-6. `README.md` roadmap updated — check off completed items
-7. `docs/README.md` concepts/constructs table updated
-8. SST v3 → forge mapping table in `CLAUDE.md` updated
-9. `constructs/` file structure comment in `CLAUDE.md` updated
 
 ---
 
