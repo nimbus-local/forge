@@ -591,9 +591,9 @@ func stageCfgTags(s *StageConfig) map[string]string {
 // DevOutputFile is the JSON structure written to FORGE_DEV_OUTPUT_FILE after a
 // successful dev-mode deploy. The CLI reads it to start the local tunnel.
 type DevOutputFile struct {
-	RequestQueueURL  string                 `json:"requestQueueUrl"`
-	ResponseQueueURL string                 `json:"responseQueueUrl"`
-	Handlers         map[string]DevHandler  `json:"handlers"`
+	RequestQueueURL  string                `json:"requestQueueUrl"`
+	ResponseQueueURL string                `json:"responseQueueUrl"`
+	Handlers         map[string]DevHandler `json:"handlers"`
 }
 
 // DevHandler holds the resolved ARN and local source path for one function.
