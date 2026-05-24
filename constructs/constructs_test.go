@@ -83,6 +83,8 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 	case "aws:s3/bucket:Bucket":
 		bname := str("bucket")
 		outputs["arn"] = resource.NewStringProperty("arn:aws:s3:::" + bname)
+		outputs["bucketRegionalDomainName"] = resource.NewStringProperty(bname + ".s3.us-east-1.amazonaws.com")
+		outputs["bucket"] = resource.NewStringProperty(bname)
 	case "aws:sqs/queue:Queue":
 		name := str("name")
 		outputs["arn"] = resource.NewStringProperty(
@@ -118,6 +120,20 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["id"] = resource.NewStringProperty(args.Name + "-int-id")
 	case "aws:apigatewayv2/route:Route":
 		outputs["id"] = resource.NewStringProperty(args.Name + "-route-id")
+	case "aws:lambda/functionUrl:FunctionUrl":
+		fnName := str("functionName")
+		outputs["functionUrl"] = resource.NewStringProperty(
+			"https://" + fnName + ".lambda-url.us-east-1.on.aws/",
+		)
+	case "aws:cloudfront/function:Function":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:cloudfront::123456789012:function/" + args.Name,
+		)
+	case "aws:cloudfront/distribution:Distribution":
+		outputs["domainName"] = resource.NewStringProperty(args.Name + ".cloudfront.net")
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:cloudfront::123456789012:distribution/" + args.Name,
+		)
 	}
 
 	m.mu.Lock()
@@ -1259,4 +1275,400 @@ func TestBuildContainerDefs_NoPort(t *testing.T) {
 			return nil
 		})
 	})
+}
+
+// ── NextjsSite tests ──────────────────────────────────────────────────────────
+// NewNextjsSite runs npm install + open-next build during normal operation.
+// Tests use NextjsSiteArgs.testOpenNextDir to bypass the build step and point
+// directly at pre-built testdata fixtures so the Pulumi mock framework can run
+// without Node.js or network access.
+
+// nextjsOpenNextDir returns the absolute path to a testdata fixture directory.
+// withImg=true → includes image-optimization-function subdirectory.
+func nextjsOpenNextDir(t *testing.T, withImg bool) string {
+	t.Helper()
+	if withImg {
+		return absTestdata(t, "nextjs-with-img/.open-next")
+	}
+	return absTestdata(t, "nextjs-no-img/.open-next")
+}
+
+func absTestdata(t *testing.T, rel string) string {
+	t.Helper()
+	// constructs_test.go lives in the constructs/ package directory.
+	// testdata/ is a sibling of this file.
+	abs := "testdata/" + rel
+	return abs
+}
+
+// runNextjsSiteTest is a convenience wrapper that wires testOpenNextDir and runs
+// the Pulumi mock, returning the captured resources.
+func runNextjsSiteTest(t *testing.T, withImg bool, extraArgs *NextjsSiteArgs) *testMocks {
+	t.Helper()
+	args := &NextjsSiteArgs{}
+	if extraArgs != nil {
+		*args = *extraArgs
+	}
+	args.testOpenNextDir = nextjsOpenNextDir(t, withImg)
+
+	return runTest(t, func(ctx *forge.RunContext) {
+		NewNextjsSite(ctx, "Web", args)
+	})
+}
+
+func TestNewNextjsSite_HostForwardFunctionAlwaysCreated(t *testing.T) {
+	t.Parallel()
+	for _, withImg := range []bool{true, false} {
+		withImg := withImg
+		t.Run(map[bool]string{true: "with-img", false: "no-img"}[withImg], func(t *testing.T) {
+			t.Parallel()
+			mocks := runNextjsSiteTest(t, withImg, nil)
+			if mocks.find("aws:cloudfront/function:Function") == nil {
+				t.Error("CloudFront viewer-request function not created")
+			}
+		})
+	}
+}
+
+func TestNewNextjsSite_DistributionCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+	if mocks.find("aws:cloudfront/distribution:Distribution") == nil {
+		t.Error("CloudFront distribution not created")
+	}
+}
+
+func TestNewNextjsSite_SSRLambdaAndFunctionUrlCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	fns := mocks.findAll("aws:lambda/function:Function")
+	if len(fns) == 0 {
+		t.Fatal("no Lambda function created")
+	}
+	// Exactly one SSR Lambda when no image optimisation.
+	if len(fns) != 1 {
+		t.Errorf("expected 1 Lambda (SSR only), got %d", len(fns))
+	}
+	if mocks.find("aws:lambda/functionUrl:FunctionUrl") == nil {
+		t.Error("SSR Lambda Function URL not created")
+	}
+}
+
+func TestNewNextjsSite_SSRLambdaPhysicalNameQualified(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	var ssrFn *capturedResource
+	for _, r := range mocks.findAll("aws:lambda/function:Function") {
+		r := r
+		if strings.HasSuffix(r.inputs["name"].StringValue(), "-server") {
+			ssrFn = &r
+		}
+	}
+	if ssrFn == nil {
+		t.Fatal("SSR Lambda not found")
+	}
+	if ssrFn.inputs["name"].StringValue() != "myapp-test-Web-server" {
+		t.Errorf("SSR Lambda name = %q, want %q",
+			ssrFn.inputs["name"].StringValue(), "myapp-test-Web-server")
+	}
+}
+
+func TestNewNextjsSite_ImageOptLambdaCreatedWhenDirPresent(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, true, nil) // withImg=true
+
+	fns := mocks.findAll("aws:lambda/function:Function")
+	if len(fns) != 2 {
+		t.Errorf("expected 2 Lambdas (SSR + image), got %d", len(fns))
+	}
+	urls := mocks.findAll("aws:lambda/functionUrl:FunctionUrl")
+	if len(urls) != 2 {
+		t.Errorf("expected 2 Function URLs (SSR + image), got %d", len(urls))
+	}
+}
+
+func TestNewNextjsSite_ImageOptLambdaAbsentWhenDirMissing(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil) // withImg=false
+
+	fns := mocks.findAll("aws:lambda/function:Function")
+	if len(fns) != 1 {
+		t.Errorf("expected 1 Lambda (SSR only, no image dir), got %d", len(fns))
+	}
+}
+
+func TestNewNextjsSite_ImageOptLambdaPhysicalNameQualified(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	var imgFn *capturedResource
+	for _, r := range mocks.findAll("aws:lambda/function:Function") {
+		r := r
+		if strings.HasSuffix(r.inputs["name"].StringValue(), "-image") {
+			imgFn = &r
+		}
+	}
+	if imgFn == nil {
+		t.Fatal("image Lambda not found")
+	}
+	if imgFn.inputs["name"].StringValue() != "myapp-test-Web-image" {
+		t.Errorf("image Lambda name = %q, want %q",
+			imgFn.inputs["name"].StringValue(), "myapp-test-Web-image")
+	}
+}
+
+func TestNewNextjsSite_ImageOptS3PolicyCreated(t *testing.T) {
+	t.Parallel()
+	// When image optimisation is present, an IAM role policy granting s3:GetObject
+	// must be attached to the image Lambda role.
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	policies := mocks.findAll("aws:iam/rolePolicy:RolePolicy")
+	if len(policies) == 0 {
+		t.Error("no IAM role policy created — image Lambda needs s3:GetObject policy")
+	}
+	// At least one policy should contain s3:GetObject.
+	found := false
+	for _, p := range policies {
+		if v, ok := p.inputs["policy"]; ok && strings.Contains(v.StringValue(), "s3:GetObject") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("no IAM role policy contains s3:GetObject for image Lambda")
+	}
+}
+
+func TestNewNextjsSite_OrderedBehaviorsWithImageOpt(t *testing.T) {
+	t.Parallel()
+	// With image optimisation: /_next/image* + /_next/static/* = 2 ordered behaviors.
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	behaviors := dist.inputs["orderedCacheBehaviors"]
+	if !behaviors.IsArray() {
+		t.Fatal("orderedCacheBehaviors is not an array")
+	}
+	if len(behaviors.ArrayValue()) != 2 {
+		t.Errorf("expected 2 ordered cache behaviors (/_next/image* + /_next/static/*), got %d",
+			len(behaviors.ArrayValue()))
+	}
+}
+
+func TestNewNextjsSite_OrderedBehaviorsWithoutImageOpt(t *testing.T) {
+	t.Parallel()
+	// Without image optimisation: only /_next/static/* = 1 ordered behavior.
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	behaviors := dist.inputs["orderedCacheBehaviors"]
+	if !behaviors.IsArray() {
+		t.Fatal("orderedCacheBehaviors is not an array")
+	}
+	if len(behaviors.ArrayValue()) != 1 {
+		t.Errorf("expected 1 ordered cache behavior (/_next/static/* only), got %d",
+			len(behaviors.ArrayValue()))
+	}
+}
+
+func TestNewNextjsSite_DefaultBehaviorHasFunctionAssociation(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	dcb := dist.inputs["defaultCacheBehavior"]
+	if !dcb.IsObject() {
+		t.Fatal("defaultCacheBehavior missing")
+	}
+	fa := dcb.ObjectValue()["functionAssociations"]
+	if !fa.IsArray() || len(fa.ArrayValue()) == 0 {
+		t.Error("defaultCacheBehavior missing functionAssociations (host-forward CloudFront function)")
+	}
+}
+
+func TestNewNextjsSite_OriginsWithImageOpt(t *testing.T) {
+	t.Parallel()
+	// With image optimisation: S3 + SSR Lambda + image Lambda = 3 origins.
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	origins := dist.inputs["origins"]
+	if !origins.IsArray() {
+		t.Fatal("origins is not an array")
+	}
+	if len(origins.ArrayValue()) != 3 {
+		t.Errorf("expected 3 origins (S3 + SSR + image), got %d", len(origins.ArrayValue()))
+	}
+}
+
+func TestNewNextjsSite_OriginsWithoutImageOpt(t *testing.T) {
+	t.Parallel()
+	// Without image optimisation: S3 + SSR Lambda = 2 origins.
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	origins := dist.inputs["origins"]
+	if !origins.IsArray() {
+		t.Fatal("origins is not an array")
+	}
+	if len(origins.ArrayValue()) != 2 {
+		t.Errorf("expected 2 origins (S3 + SSR), got %d", len(origins.ArrayValue()))
+	}
+}
+
+func TestNewNextjsSite_LinkEnvKeys(t *testing.T) {
+	t.Parallel()
+	runTest(t, func(ctx *forge.RunContext) {
+		site := NewNextjsSite(ctx, "Web", &NextjsSiteArgs{
+			testOpenNextDir: nextjsOpenNextDir(t, false),
+		})
+		linkEnv := site.LinkEnv()
+		if _, ok := linkEnv["SST_SITE_WEB_URL"]; !ok {
+			t.Error("LinkEnv missing SST_SITE_WEB_URL")
+		}
+		if len(linkEnv) != 1 {
+			t.Errorf("LinkEnv has %d keys, want 1", len(linkEnv))
+		}
+		if site.LinkName() != "Web" {
+			t.Errorf("LinkName = %q, want %q", site.LinkName(), "Web")
+		}
+	})
+}
+
+func TestNewNextjsSite_TagsApplied(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	dist := mocks.find("aws:cloudfront/distribution:Distribution")
+	if dist == nil {
+		t.Fatal("CloudFront distribution not registered")
+	}
+	for _, tag := range []string{"forge:app", "forge:stage", "forge:name"} {
+		assertTag(t, dist.inputs, tag)
+	}
+}
+
+func TestNewNextjsSite_IAMRoleCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	if mocks.find("aws:iam/role:Role") == nil {
+		t.Error("IAM role not created for SSR Lambda")
+	}
+}
+
+func TestNewNextjsSite_TwoIAMRolesWithImageOpt(t *testing.T) {
+	t.Parallel()
+	// With image optimisation, expect two IAM roles: SSR + image Lambda.
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	roles := mocks.findAll("aws:iam/role:Role")
+	if len(roles) < 2 {
+		t.Errorf("expected at least 2 IAM roles (SSR + image), got %d", len(roles))
+	}
+}
+
+func TestNewNextjsSite_PublicInvokePermissionsCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	// SSR Lambda needs both lambda:InvokeFunctionUrl and lambda:InvokeFunction permissions.
+	perms := mocks.findAll("aws:lambda/permission:Permission")
+	if len(perms) < 2 {
+		t.Errorf("expected at least 2 Lambda permissions (InvokeFunctionUrl + InvokeFunction), got %d", len(perms))
+	}
+}
+
+func TestNewNextjsSite_FourInvokePermissionsWithImageOpt(t *testing.T) {
+	t.Parallel()
+	// SSR + image Lambda each need 2 permissions = 4 total.
+	mocks := runNextjsSiteTest(t, true, nil)
+
+	perms := mocks.findAll("aws:lambda/permission:Permission")
+	if len(perms) != 4 {
+		t.Errorf("expected 4 Lambda permissions (2 SSR + 2 image), got %d", len(perms))
+	}
+}
+
+func TestNewNextjsSite_HostForwardFunctionNameQualified(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	fn := mocks.find("aws:cloudfront/function:Function")
+	if fn == nil {
+		t.Fatal("CloudFront function not registered")
+	}
+	name := fn.inputs["name"].StringValue()
+	if name != "myapp-test-Web-host-fwd" {
+		t.Errorf("CloudFront function name = %q, want %q", name, "myapp-test-Web-host-fwd")
+	}
+}
+
+func TestNewNextjsSite_HostForwardFunctionCode(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	fn := mocks.find("aws:cloudfront/function:Function")
+	if fn == nil {
+		t.Fatal("CloudFront function not registered")
+	}
+	code := fn.inputs["code"].StringValue()
+	if !strings.Contains(code, "x-forwarded-host") {
+		t.Error("CloudFront function code does not set x-forwarded-host")
+	}
+	if !strings.Contains(code, `req.headers["host"].value`) {
+		t.Error("CloudFront function code does not read host header")
+	}
+}
+
+func TestNewNextjsSite_LogGroupsCreated(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		withImg bool
+		wantN   int
+	}{
+		{"no-img", false, 1},
+		{"with-img", true, 2},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mocks := runNextjsSiteTest(t, tc.withImg, nil)
+			logs := mocks.findAll("aws:cloudwatch/logGroup:LogGroup")
+			if len(logs) != tc.wantN {
+				t.Errorf("expected %d log group(s), got %d", tc.wantN, len(logs))
+			}
+		})
+	}
+}
+
+func TestNewNextjsSite_AssetsS3BucketCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	if mocks.find("aws:s3/bucket:Bucket") == nil {
+		t.Error("S3 assets bucket not created")
+	}
+	if mocks.find("aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock") == nil {
+		t.Error("S3 public access block not created")
+	}
 }

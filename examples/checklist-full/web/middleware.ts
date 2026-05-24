@@ -2,10 +2,9 @@ import { getToken } from 'next-auth/jwt'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// next-auth/middleware derives the redirect base URL from the request Host header.
-// Behind CloudFront, the Host header seen by Lambda is the Lambda Function URL, not
-// the CloudFront domain. Using NEXTAUTH_URL as the base keeps the browser on the
-// correct domain so static assets resolve against CloudFront.
+// The NewNextjsSite CloudFront viewer-request function copies Host → x-forwarded-host
+// before forwarding to the Lambda origin, so the public CloudFront domain is always
+// available here regardless of what the Lambda Function URL host header says.
 export async function middleware(req: NextRequest) {
   const token = await getToken({
     req,
@@ -13,8 +12,8 @@ export async function middleware(req: NextRequest) {
   })
 
   if (!token) {
-    const base = process.env.NEXTAUTH_URL ?? req.nextUrl.origin
-    const loginUrl = new URL('/login', base)
+    const host = req.headers.get('x-forwarded-host') ?? req.nextUrl.host
+    const loginUrl = new URL('/login', `https://${host}`)
     loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
     return NextResponse.redirect(loginUrl)
   }

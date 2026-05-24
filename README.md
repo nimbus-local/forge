@@ -313,7 +313,7 @@ don't carry Pulumi as a dependency.
 - [x] Full godoc + docs site
 - [x] Deploy / destroy / diff summary tables
 - [x] Dev tunnel stub binary (`forge-stub`)
-- [x] Static site (`NewStaticSite`) and Next.js site (`NewNextjsSite`)
+- [x] Static site (`NewStaticSite`) and Next.js site (`NewNextjsSite`) with CloudFront host-header forwarding and image optimisation Lambda
 - [x] Fargate / ECS construct (`NewService`)
 - [x] GitHub Actions CI/CD integration guide
 - [x] Web console (`forge console`)
