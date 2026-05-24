@@ -22,6 +22,8 @@ type QueueArgs struct {
 	BatchSize int
 	// DeadLetterQueue creates a sibling DLQ with a max receive count of 3.
 	DeadLetterQueue bool
+	// KMSKeyArn is the ARN of a customer-managed KMS key for SQS message encryption.
+	KMSKeyArn pulumi.StringInput
 }
 
 // Queue is an SQS queue construct.
@@ -74,6 +76,9 @@ func NewQueue(ctx *forge.RunContext, name string, args *QueueArgs) *Queue {
 		FifoQueue:                pulumi.Bool(args.Fifo),
 		VisibilityTimeoutSeconds: pulumi.Int(args.VisibilityTimeout),
 		Tags:                     defaultTags(ctx, name),
+	}
+	if args.KMSKeyArn != nil {
+		queueArgs.KmsMasterKeyId = args.KMSKeyArn
 	}
 
 	if dlq != nil {

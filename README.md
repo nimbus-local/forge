@@ -202,6 +202,7 @@ their identifiers as environment variables.
 | `NewQueue` | SQS queue + optional consumer | `SST_QUEUE_<NAME>_URL`, `SST_QUEUE_<NAME>_ARN` |
 | `NewTopic` | SNS topic + subscribers | `SST_TOPIC_<NAME>_ARN` |
 | `NewSecret` | SSM SecureString at deploy time | `SST_SECRET_<NAME>` |
+| `NewKMSKey` | Customer-managed KMS key | `SST_KMS_<NAME>_ARN`, `SST_KMS_<NAME>_ID` |
 | `NewStaticSite` | S3 + CloudFront static website | `SST_SITE_<NAME>_URL` |
 | `NewNextjsSite` | Next.js on S3 + CloudFront + Lambda | `SST_SITE_<NAME>_URL` |
 | `NewService` | ECS Fargate service + optional ALB | `SST_SERVICE_<NAME>_URL` |
@@ -347,6 +348,7 @@ This milestone adds structured assertions on top of that.
 
 ### Phase 3 — Hardening
 
+- [x] KMS encryption + configurable log retention and S3 lifecycle — `NewKMSKey`, `KMSKeyArn` on all constructs, `LogRetentionDays`, `LifecycleDays`
 - [ ] Aurora / RDS construct (`NewDatabase`) — RDS Postgres/MySQL + connection string injection
 - [ ] ElastiCache construct (`NewCache`) — Redis/Valkey cluster + connection string injection
 - [ ] Drift detection — `forge drift` compares live AWS state against Pulumi state

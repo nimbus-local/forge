@@ -103,7 +103,7 @@ for key in \
   SST_TABLE_RECORDS_ARN \
   SST_BUCKET_ASSETS_NAME \
   SST_BUCKET_ASSETS_ARN \
-  SST_SECRET_SMOKE_KEY; do
+  SST_SECRET_APP_SECRET; do
   if echo "$ENV_JSON" | grep -q "\"${key}\""; then
     ok "env ${key} injected"
   else
@@ -113,11 +113,11 @@ done
 
 # Spot-check the secret value was resolved.
 SECRET_VAL=$(echo "$ENV_JSON" | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); print(d.get('SST_SECRET_SMOKE_KEY',''))" 2>/dev/null || echo "")
-if [ "$SECRET_VAL" = "ci-smoke-secret" ]; then
-  ok "SST_SECRET_SMOKE_KEY = ci-smoke-secret (correct value)"
+  "import json,sys; d=json.load(sys.stdin); print(d.get('SST_SECRET_APP_SECRET',''))" 2>/dev/null || echo "")
+if [ "$SECRET_VAL" = "smoke-default" ]; then
+  ok "SST_SECRET_APP_SECRET = smoke-default (correct value)"
 else
-  fail "SST_SECRET_SMOKE_KEY value mismatch" "got: ${SECRET_VAL}"
+  fail "SST_SECRET_APP_SECRET value mismatch" "got: ${SECRET_VAL}"
 fi
 
 # ── API Gateway v2 ────────────────────────────────────────────────────────────

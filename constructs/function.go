@@ -46,6 +46,15 @@ type FunctionArgs struct {
 	// For Go: build with GOARCH=arm64 GOOS=linux go build -o bootstrap, then zip the binary.
 	// If empty, the Lambda is registered without code — deploy code separately (e.g. via CI).
 	Code string
+	// KMSKeyArn is the ARN of a customer-managed KMS key used to encrypt the function's
+	// environment variables. A kms:Grant is created automatically for the execution role.
+	// The key policy must also allow the CloudWatch Logs service principal to use the key
+	// if log group encryption is desired.
+	KMSKeyArn pulumi.StringInput
+	// LogRetentionDays sets CloudWatch log retention. 0 = default (14 days), -1 = never expire.
+	// Valid non-zero values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731,
+	// 1096, 1827, 2192, 2557, 2922, 3288, 3653.
+	LogRetentionDays int
 }
 
 // NewFunction creates a Lambda function construct.
@@ -86,11 +95,17 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	panicOnErr(err, name+": iam role")
 
 	// ── CloudWatch log group ──────────────────────────────────────────────────
-	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", &cloudwatch.LogGroupArgs{
-		Name:            pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name)),
-		RetentionInDays: pulumi.Int(14),
-		Tags:            defaultTags(ctx, name),
-	})
+	logGroupArgs := &cloudwatch.LogGroupArgs{
+		Name: pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name)),
+		Tags: defaultTags(ctx, name),
+	}
+	if r := resolveLogRetention(args.LogRetentionDays); r != 0 {
+		logGroupArgs.RetentionInDays = pulumi.Int(r)
+	}
+	if args.KMSKeyArn != nil {
+		logGroupArgs.KmsKeyId = args.KMSKeyArn
+	}
+	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", logGroupArgs)
 	panicOnErr(err, name+": log group")
 
 	// ── Merge environment variables ───────────────────────────────────────────
@@ -139,9 +154,17 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	if args.Code != "" {
 		fnArgs.Code = pulumi.NewFileArchive(resolvePath(ctx, args.Code))
 	}
+	if args.KMSKeyArn != nil {
+		fnArgs.KmsKeyArn = args.KMSKeyArn
+	}
 
 	fn, err := awslambda.NewFunction(pctx, name, fnArgs)
 	panicOnErr(err, name+": lambda function")
+
+	// Grant the execution role KMS permissions when a customer-managed key is provided.
+	if args.KMSKeyArn != nil {
+		kmsGrant(pctx, name, args.KMSKeyArn, role.Arn)
+	}
 
 	// ── Optional Function URL ─────────────────────────────────────────────────
 	if args.URL {
