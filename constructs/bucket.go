@@ -18,6 +18,12 @@ type BucketArgs struct {
 	CORS bool
 	// CORSAllowOrigins defaults to ["*"] when CORS is true.
 	CORSAllowOrigins []string
+	// KMSKeyArn is the ARN of a customer-managed KMS key for SSE-KMS encryption.
+	// When set, all objects are encrypted with the specified key.
+	KMSKeyArn pulumi.StringInput
+	// LifecycleDays expires current objects after N days. 0 means no lifecycle rule.
+	// When Versioning is also true, noncurrent versions are expired at the same age.
+	LifecycleDays int
 }
 
 // Bucket is an S3 bucket construct.
@@ -84,6 +90,45 @@ func NewBucket(ctx *forge.RunContext, name string, args *BucketArgs) *Bucket {
 			RestrictPublicBuckets: pulumi.Bool(true),
 		})
 		panicOnErr(err, name+": public access block")
+	}
+
+	// SSE-KMS encryption with a customer-managed key.
+	if args.KMSKeyArn != nil {
+		_, err = s3.NewBucketServerSideEncryptionConfigurationV2(pctx, name+"-sse", &s3.BucketServerSideEncryptionConfigurationV2Args{
+			Bucket: bucket.ID(),
+			Rules: s3.BucketServerSideEncryptionConfigurationV2RuleArray{
+				&s3.BucketServerSideEncryptionConfigurationV2RuleArgs{
+					ApplyServerSideEncryptionByDefault: &s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs{
+						SseAlgorithm:   pulumi.String("aws:kms"),
+						KmsMasterKeyId: args.KMSKeyArn,
+					},
+					BucketKeyEnabled: pulumi.Bool(true),
+				},
+			},
+		})
+		panicOnErr(err, name+": bucket sse config")
+	}
+
+	// Object lifecycle rule — expire current objects (and noncurrent versions if versioning
+	// is enabled) after the specified number of days.
+	if args.LifecycleDays > 0 {
+		rule := &s3.BucketLifecycleConfigurationV2RuleArgs{
+			Id:     pulumi.String("expire"),
+			Status: pulumi.String("Enabled"),
+			Expiration: &s3.BucketLifecycleConfigurationV2RuleExpirationArgs{
+				Days: pulumi.Int(args.LifecycleDays),
+			},
+		}
+		if args.Versioning {
+			rule.NoncurrentVersionExpiration = &s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs{
+				NoncurrentDays: pulumi.Int(args.LifecycleDays),
+			}
+		}
+		_, err = s3.NewBucketLifecycleConfigurationV2(pctx, name+"-lifecycle", &s3.BucketLifecycleConfigurationV2Args{
+			Bucket: bucket.ID(),
+			Rules:  s3.BucketLifecycleConfigurationV2RuleArray{rule},
+		})
+		panicOnErr(err, name+": bucket lifecycle")
 	}
 
 	return &Bucket{name: name, resource: bucket, ctx: ctx}

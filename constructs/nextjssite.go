@@ -73,6 +73,16 @@ type NextjsSiteArgs struct {
 	// PriceClass limits the CloudFront edge network.
 	// Defaults to "PriceClass_100" (US + Europe).
 	PriceClass string
+	// KMSKeyArn is the ARN of a customer-managed KMS key applied to the SSR Lambda
+	// environment variables, its CloudWatch log group, and the static assets S3 bucket.
+	// A kms:Grant is created automatically for the SSR Lambda execution role.
+	// The key policy must also allow the CloudWatch Logs service principal.
+	KMSKeyArn pulumi.StringInput
+	// LogRetentionDays sets CloudWatch log retention for the SSR (and image) Lambda log groups.
+	// 0 = default (14 days), -1 = never expire.
+	// Valid non-zero values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731,
+	// 1096, 1827, 2192, 2557, 2922, 3288, 3653.
+	LogRetentionDays int
 
 	// testOpenNextDir bypasses npm install + open-next build and uses this
 	// directory directly as the .open-next/ output. For testing only.
@@ -154,6 +164,22 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	})
 	panicOnErr(err, name+": public access block")
 
+	if args.KMSKeyArn != nil {
+		_, err = s3.NewBucketServerSideEncryptionConfigurationV2(pctx, name+"-assets-sse", &s3.BucketServerSideEncryptionConfigurationV2Args{
+			Bucket: bucket.ID(),
+			Rules: s3.BucketServerSideEncryptionConfigurationV2RuleArray{
+				&s3.BucketServerSideEncryptionConfigurationV2RuleArgs{
+					ApplyServerSideEncryptionByDefault: &s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs{
+						SseAlgorithm:   pulumi.String("aws:kms"),
+						KmsMasterKeyId: args.KMSKeyArn,
+					},
+					BucketKeyEnabled: pulumi.Bool(true),
+				},
+			},
+		})
+		panicOnErr(err, name+": assets bucket sse config")
+	}
+
 	oac, err := cloudfront.NewOriginAccessControl(pctx, name+"-oac", &cloudfront.OriginAccessControlArgs{
 		Name:                          pulumi.String(qualifiedName(ctx, name)),
 		OriginAccessControlOriginType: pulumi.String("s3"),
@@ -179,11 +205,17 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	})
 	panicOnErr(err, name+": iam role")
 
-	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", &cloudwatch.LogGroupArgs{
-		Name:            pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name+"-server")),
-		RetentionInDays: pulumi.Int(14),
-		Tags:            defaultTags(ctx, name),
-	})
+	ssrLogArgs := &cloudwatch.LogGroupArgs{
+		Name: pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name+"-server")),
+		Tags: defaultTags(ctx, name),
+	}
+	if r := resolveLogRetention(args.LogRetentionDays); r != 0 {
+		ssrLogArgs.RetentionInDays = pulumi.Int(r)
+	}
+	if args.KMSKeyArn != nil {
+		ssrLogArgs.KmsKeyId = args.KMSKeyArn
+	}
+	_, err = cloudwatch.NewLogGroup(pctx, name+"-logs", ssrLogArgs)
 	panicOnErr(err, name+": log group")
 
 	// ── Lambda environment variables ──────────────────────────────────────────
@@ -201,7 +233,7 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 	}
 
 	// ── SSR Lambda function ───────────────────────────────────────────────────
-	fn, err := awslambda.NewFunction(pctx, name+"-server", &awslambda.FunctionArgs{
+	ssrFnArgs := &awslambda.FunctionArgs{
 		Name:          pulumi.String(qualifiedName(ctx, name+"-server")),
 		Role:          role.Arn,
 		Runtime:       pulumi.String(RuntimeNodeJS24),
@@ -214,8 +246,16 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 			Variables: envVars,
 		},
 		Tags: defaultTags(ctx, name),
-	})
+	}
+	if args.KMSKeyArn != nil {
+		ssrFnArgs.KmsKeyArn = args.KMSKeyArn
+	}
+	fn, err := awslambda.NewFunction(pctx, name+"-server", ssrFnArgs)
 	panicOnErr(err, name+": lambda function")
+
+	if args.KMSKeyArn != nil {
+		kmsGrant(pctx, name+"-server", args.KMSKeyArn, role.Arn)
+	}
 
 	// AuthorizationType NONE + two public resource-based policy statements is required for
 	// CloudFront → Lambda Function URL to work. AWS_IAM requires SigV4 signing which
@@ -274,11 +314,17 @@ func NewNextjsSite(ctx *forge.RunContext, name string, args *NextjsSiteArgs) *Ne
 		})
 		panicOnErr(err, name+": image iam role")
 
-		_, err = cloudwatch.NewLogGroup(pctx, name+"-image-logs", &cloudwatch.LogGroupArgs{
-			Name:            pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name+"-image")),
-			RetentionInDays: pulumi.Int(14),
-			Tags:            defaultTags(ctx, name),
-		})
+		imgLogArgs := &cloudwatch.LogGroupArgs{
+			Name: pulumi.Sprintf("/aws/lambda/%s", qualifiedName(ctx, name+"-image")),
+			Tags: defaultTags(ctx, name),
+		}
+		if r := resolveLogRetention(args.LogRetentionDays); r != 0 {
+			imgLogArgs.RetentionInDays = pulumi.Int(r)
+		}
+		if args.KMSKeyArn != nil {
+			imgLogArgs.KmsKeyId = args.KMSKeyArn
+		}
+		_, err = cloudwatch.NewLogGroup(pctx, name+"-image-logs", imgLogArgs)
 		panicOnErr(err, name+": image log group")
 
 		// Grant the image Lambda read access to the S3 assets bucket.

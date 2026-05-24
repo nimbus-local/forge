@@ -49,6 +49,9 @@ type DynamoDBArgs struct {
 	StreamEnabled bool
 	// StreamViewType defaults to "NEW_AND_OLD_IMAGES".
 	StreamViewType string
+	// KMSKeyArn is the ARN of a customer-managed KMS key for DynamoDB SSE-KMS encryption.
+	// Replaces the default AWS-owned key.
+	KMSKeyArn pulumi.StringInput
 }
 
 // DynamoDB is a DynamoDB table construct.
@@ -107,6 +110,13 @@ func NewDynamoDB(ctx *forge.RunContext, name string, args *DynamoDBArgs) *Dynamo
 		}
 		tableArgs.StreamEnabled = pulumi.Bool(true)
 		tableArgs.StreamViewType = pulumi.String(viewType)
+	}
+
+	if args.KMSKeyArn != nil {
+		tableArgs.ServerSideEncryption = &dynamodb.TableServerSideEncryptionArgs{
+			Enabled:   pulumi.Bool(true),
+			KmsKeyArn: args.KMSKeyArn,
+		}
 	}
 
 	// GSIs

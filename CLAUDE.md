@@ -220,11 +220,12 @@ github.com/nimbus-local/forge/
 ├── go.mod                       Module definition
 │
 ├── constructs/
-│   ├── helpers.go               qualifiedName(), defaultTags(), envKey(), panicOnErr()
+│   ├── helpers.go               qualifiedName(), defaultTags(), envKey(), panicOnErr(), resolveLogRetention()
 │   ├── function.go              NewFunction() — Lambda + IAM role + log group + env injection + optional Code zip
 │   ├── api.go                   NewApiGatewayV2() — HTTP API with route() helper
 │   ├── table.go                 NewDynamoDB() — table + GSI support
-│   ├── bucket.go                NewBucket() — S3 + CORS + public access block
+│   ├── bucket.go                NewBucket() — S3 + CORS + public access block + SSE-KMS + lifecycle
+│   ├── kms.go                   NewKMSKey() — KMS symmetric key + alias + kmsGrant() helper
 │   └── service.go               NewService() — ECS Fargate + ALB
 │
 ├── secrets/
@@ -829,6 +830,7 @@ Pending:
 | `new sst.aws.Queue("X", {...})` | `constructs.NewQueue(ctx, "X", &constructs.QueueArgs{...})` |
 | `new sst.aws.Topic("X", {...})` | `constructs.NewTopic(ctx, "X", &constructs.TopicArgs{...})` |
 | `new sst.Secret("X")` | `constructs.NewSecret(ctx, "X", nil)` |
+| `new aws.kms.Key("X", {...})` | `constructs.NewKMSKey(ctx, "X", &constructs.KMSKeyArgs{...})` |
 | `new sst.aws.StaticSite("X", {...})` | `constructs.NewStaticSite(ctx, "X", &constructs.StaticSiteArgs{...})` |
 | `new sst.aws.NextjsSite("X", {...})` | `constructs.NewNextjsSite(ctx, "X", &constructs.NextjsSiteArgs{...})` |
 | `new sst.aws.Service("X", {...})` | `constructs.NewService(ctx, "X", &constructs.ServiceArgs{...})` |

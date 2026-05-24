@@ -15,6 +15,8 @@ type TopicArgs struct {
 	Subscribers []*FunctionArgs
 	// FIFO creates a FIFO topic with content-based deduplication enabled.
 	FIFO bool
+	// KMSKeyArn is the ARN of a customer-managed KMS key for SNS message encryption.
+	KMSKeyArn pulumi.StringInput
 }
 
 // Topic is an SNS topic construct.
@@ -41,6 +43,9 @@ func NewTopic(ctx *forge.RunContext, name string, args *TopicArgs) *Topic {
 		topicArgs.Name = pulumi.String(topicName + ".fifo")
 		topicArgs.FifoTopic = pulumi.Bool(true)
 		topicArgs.ContentBasedDeduplication = pulumi.Bool(true)
+	}
+	if args.KMSKeyArn != nil {
+		topicArgs.KmsMasterKeyId = args.KMSKeyArn
 	}
 
 	topic, err := sns.NewTopic(pctx, name, topicArgs)

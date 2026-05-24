@@ -1,6 +1,7 @@
 package constructs
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -115,6 +116,46 @@ func TestEnvKey(t *testing.T) {
 			if got := envKey(tc.in); got != tc.want {
 				t.Errorf("envKey(%q) = %q, want %q", tc.in, got, tc.want)
 			}
+		})
+	}
+}
+
+func TestResolveLogRetention(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   int
+		want int
+	}{
+		{0, 14},  // default
+		{-1, 0},  // never expire → CloudWatch 0
+		{14, 14}, // valid, returned as-is
+		{30, 30},
+		{365, 365},
+		{3653, 3653},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(fmt.Sprintf("days=%d", tc.in), func(t *testing.T) {
+			t.Parallel()
+			if got := resolveLogRetention(tc.in); got != tc.want {
+				t.Errorf("resolveLogRetention(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolveLogRetention_InvalidPanics(t *testing.T) {
+	t.Parallel()
+	for _, bad := range []int{2, 4, 6, 8, 100, 999} {
+		bad := bad
+		t.Run(fmt.Sprintf("days=%d", bad), func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("expected panic for invalid LogRetentionDays %d", bad)
+				}
+			}()
+			resolveLogRetention(bad)
 		})
 	}
 }

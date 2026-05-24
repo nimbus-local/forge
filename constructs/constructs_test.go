@@ -134,6 +134,15 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["arn"] = resource.NewStringProperty(
 			"arn:aws:cloudfront::123456789012:distribution/" + args.Name,
 		)
+	case "aws:kms/key:Key":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:kms:us-east-1:123456789012:key/" + args.Name,
+		)
+		outputs["keyId"] = resource.NewStringProperty(args.Name + "-key-id")
+	case "aws:kms/alias:Alias":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:kms:us-east-1:123456789012:alias/" + args.Name,
+		)
 	}
 
 	m.mu.Lock()
@@ -1670,5 +1679,433 @@ func TestNewNextjsSite_AssetsS3BucketCreated(t *testing.T) {
 	}
 	if mocks.find("aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock") == nil {
 		t.Error("S3 public access block not created")
+	}
+}
+
+// ── KMSKey tests ──────────────────────────────────────────────────────────────
+
+func TestNewKMSKey_KeyAndAliasCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewKMSKey(ctx, "DataKey", nil)
+	})
+
+	if mocks.find("aws:kms/key:Key") == nil {
+		t.Error("KMS key not created")
+	}
+	if mocks.find("aws:kms/alias:Alias") == nil {
+		t.Error("KMS alias not created")
+	}
+}
+
+func TestNewKMSKey_RotationEnabledByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewKMSKey(ctx, "DataKey", nil)
+	})
+
+	r := mocks.find("aws:kms/key:Key")
+	if r == nil {
+		t.Fatal("KMS key not registered")
+	}
+	if !r.inputs["enableKeyRotation"].IsBool() || !r.inputs["enableKeyRotation"].BoolValue() {
+		t.Error("key rotation should be enabled by default")
+	}
+}
+
+func TestNewKMSKey_DisableRotation(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewKMSKey(ctx, "DataKey", &KMSKeyArgs{DisableRotation: true})
+	})
+
+	r := mocks.find("aws:kms/key:Key")
+	if r == nil {
+		t.Fatal("KMS key not registered")
+	}
+	if r.inputs["enableKeyRotation"].IsBool() && r.inputs["enableKeyRotation"].BoolValue() {
+		t.Error("key rotation should be disabled when DisableRotation: true")
+	}
+}
+
+func TestNewKMSKey_DeletionWindowDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewKMSKey(ctx, "DataKey", nil)
+	})
+
+	r := mocks.find("aws:kms/key:Key")
+	if r == nil {
+		t.Fatal("KMS key not registered")
+	}
+	if r.inputs["deletionWindowInDays"].NumberValue() != 30 {
+		t.Errorf("deletionWindowInDays = %v, want 30", r.inputs["deletionWindowInDays"].NumberValue())
+	}
+}
+
+func TestNewKMSKey_TagsApplied(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewKMSKey(ctx, "DataKey", nil)
+	})
+
+	r := mocks.find("aws:kms/key:Key")
+	if r == nil {
+		t.Fatal("KMS key not registered")
+	}
+	for _, tag := range []string{"forge:app", "forge:stage", "forge:name"} {
+		assertTag(t, r.inputs, tag)
+	}
+}
+
+func TestNewKMSKey_LinkEnvKeys(t *testing.T) {
+	t.Parallel()
+	runTest(t, func(ctx *forge.RunContext) {
+		k := NewKMSKey(ctx, "DataKey", nil)
+		linkEnv := k.LinkEnv()
+		if _, ok := linkEnv["SST_KMS_DATA_KEY_ARN"]; !ok {
+			t.Error("LinkEnv missing SST_KMS_DATA_KEY_ARN")
+		}
+		if _, ok := linkEnv["SST_KMS_DATA_KEY_ID"]; !ok {
+			t.Error("LinkEnv missing SST_KMS_DATA_KEY_ID")
+		}
+		if len(linkEnv) != 2 {
+			t.Errorf("LinkEnv has %d keys, want 2", len(linkEnv))
+		}
+	})
+}
+
+func TestNewKMSKey_LinkName(t *testing.T) {
+	t.Parallel()
+	runTest(t, func(ctx *forge.RunContext) {
+		k := NewKMSKey(ctx, "DataKey", nil)
+		if k.LinkName() != "DataKey" {
+			t.Errorf("LinkName = %q, want DataKey", k.LinkName())
+		}
+	})
+}
+
+// ── Function KMS + log retention tests ───────────────────────────────────────
+
+func TestNewFunction_KMSKeyArnSetOnLambda(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{
+			Handler:   "bootstrap",
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	r := mocks.find("aws:lambda/function:Function")
+	if r == nil {
+		t.Fatal("Lambda function not registered")
+	}
+	if _, ok := r.inputs["kmsKeyArn"]; !ok {
+		t.Error("Lambda missing kmsKeyArn")
+	}
+}
+
+func TestNewFunction_KMSGrantCreated(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{
+			Handler:   "bootstrap",
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	if mocks.find("aws:kms/grant:Grant") == nil {
+		t.Error("kms.Grant not created for KMS-encrypted Lambda")
+	}
+}
+
+func TestNewFunction_NoKMSGrantWithoutKey(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", nil)
+	})
+
+	if mocks.find("aws:kms/grant:Grant") != nil {
+		t.Error("kms.Grant should not be created when no KMSKeyArn is set")
+	}
+}
+
+func TestNewFunction_LogGroupKMSKeySet(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{
+			Handler:   "bootstrap",
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	r := mocks.find("aws:cloudwatch/logGroup:LogGroup")
+	if r == nil {
+		t.Fatal("log group not registered")
+	}
+	if _, ok := r.inputs["kmsKeyId"]; !ok {
+		t.Error("log group missing kmsKeyId")
+	}
+}
+
+func TestNewFunction_DefaultLogRetention14Days(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", nil)
+	})
+
+	r := mocks.find("aws:cloudwatch/logGroup:LogGroup")
+	if r == nil {
+		t.Fatal("log group not registered")
+	}
+	if r.inputs["retentionInDays"].NumberValue() != 14 {
+		t.Errorf("default retentionInDays = %v, want 14", r.inputs["retentionInDays"].NumberValue())
+	}
+}
+
+func TestNewFunction_CustomLogRetention(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{LogRetentionDays: 30})
+	})
+
+	r := mocks.find("aws:cloudwatch/logGroup:LogGroup")
+	if r == nil {
+		t.Fatal("log group not registered")
+	}
+	if r.inputs["retentionInDays"].NumberValue() != 30 {
+		t.Errorf("retentionInDays = %v, want 30", r.inputs["retentionInDays"].NumberValue())
+	}
+}
+
+func TestNewFunction_NeverExpireLogRetention(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewFunction(ctx, "Fn", &FunctionArgs{LogRetentionDays: -1})
+	})
+
+	r := mocks.find("aws:cloudwatch/logGroup:LogGroup")
+	if r == nil {
+		t.Fatal("log group not registered")
+	}
+	// resolveLogRetention(-1) returns 0, meaning no retention limit set.
+	// The Pulumi resource property should be absent or zero.
+	if v, ok := r.inputs["retentionInDays"]; ok && v.IsNumber() && v.NumberValue() != 0 {
+		t.Errorf("retentionInDays = %v, want 0 (never expire)", v.NumberValue())
+	}
+}
+
+// ── Bucket KMS + lifecycle tests ──────────────────────────────────────────────
+
+func TestNewBucket_KMSCreatesSSEConfig(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewBucket(ctx, "Uploads", &BucketArgs{
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	if mocks.find("aws:s3/bucketServerSideEncryptionConfigurationV2:BucketServerSideEncryptionConfigurationV2") == nil {
+		t.Error("SSE-KMS config resource not created")
+	}
+}
+
+func TestNewBucket_NoSSEWithoutKMSKey(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewBucket(ctx, "Uploads", nil)
+	})
+
+	if mocks.find("aws:s3/bucketServerSideEncryptionConfigurationV2:BucketServerSideEncryptionConfigurationV2") != nil {
+		t.Error("SSE config should not be created without KMSKeyArn")
+	}
+}
+
+func TestNewBucket_LifecycleDaysCreatesRule(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewBucket(ctx, "Logs", &BucketArgs{LifecycleDays: 90})
+	})
+
+	if mocks.find("aws:s3/bucketLifecycleConfigurationV2:BucketLifecycleConfigurationV2") == nil {
+		t.Error("lifecycle config not created when LifecycleDays > 0")
+	}
+}
+
+func TestNewBucket_NoLifecycleByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewBucket(ctx, "B", nil)
+	})
+
+	if mocks.find("aws:s3/bucketLifecycleConfigurationV2:BucketLifecycleConfigurationV2") != nil {
+		t.Error("lifecycle config should not be created when LifecycleDays is 0")
+	}
+}
+
+// ── DynamoDB KMS test ─────────────────────────────────────────────────────────
+
+func TestNewDynamoDB_KMSKeyArnSetsSSE(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewDynamoDB(ctx, "Users", &DynamoDBArgs{
+			Fields:       map[string]FieldType{"pk": FieldTypeString},
+			PrimaryIndex: &PrimaryIndex{HashKey: "pk"},
+			KMSKeyArn:    pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	r := mocks.find("aws:dynamodb/table:Table")
+	if r == nil {
+		t.Fatal("DynamoDB table not registered")
+	}
+	sse, ok := r.inputs["serverSideEncryption"]
+	if !ok {
+		t.Fatal("serverSideEncryption not set on table")
+	}
+	if !sse.IsObject() {
+		t.Fatal("serverSideEncryption is not an object")
+	}
+	if !sse.ObjectValue()["enabled"].IsBool() || !sse.ObjectValue()["enabled"].BoolValue() {
+		t.Error("serverSideEncryption.enabled should be true")
+	}
+}
+
+func TestNewDynamoDB_NoSSEByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewDynamoDB(ctx, "Users", &DynamoDBArgs{
+			Fields:       map[string]FieldType{"pk": FieldTypeString},
+			PrimaryIndex: &PrimaryIndex{HashKey: "pk"},
+		})
+	})
+
+	r := mocks.find("aws:dynamodb/table:Table")
+	if r == nil {
+		t.Fatal("DynamoDB table not registered")
+	}
+	if _, ok := r.inputs["serverSideEncryption"]; ok {
+		t.Error("serverSideEncryption should not be set without KMSKeyArn")
+	}
+}
+
+// ── Queue KMS test ────────────────────────────────────────────────────────────
+
+func TestNewQueue_KMSKeyArnSet(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewQueue(ctx, "Jobs", &QueueArgs{
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	r := mocks.find("aws:sqs/queue:Queue")
+	if r == nil {
+		t.Fatal("SQS queue not registered")
+	}
+	if _, ok := r.inputs["kmsMasterKeyId"]; !ok {
+		t.Error("queue missing kmsMasterKeyId")
+	}
+}
+
+func TestNewQueue_NoKMSByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewQueue(ctx, "Jobs", nil)
+	})
+
+	r := mocks.find("aws:sqs/queue:Queue")
+	if r == nil {
+		t.Fatal("SQS queue not registered")
+	}
+	if _, ok := r.inputs["kmsMasterKeyId"]; ok {
+		t.Error("kmsMasterKeyId should not be set without KMSKeyArn")
+	}
+}
+
+// ── Topic KMS test ────────────────────────────────────────────────────────────
+
+func TestNewTopic_KMSKeyArnSet(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewTopic(ctx, "Events", &TopicArgs{
+			KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+		})
+	})
+
+	r := mocks.find("aws:sns/topic:Topic")
+	if r == nil {
+		t.Fatal("SNS topic not registered")
+	}
+	if _, ok := r.inputs["kmsMasterKeyId"]; !ok {
+		t.Error("topic missing kmsMasterKeyId")
+	}
+}
+
+func TestNewTopic_NoKMSByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runTest(t, func(ctx *forge.RunContext) {
+		NewTopic(ctx, "Events", nil)
+	})
+
+	r := mocks.find("aws:sns/topic:Topic")
+	if r == nil {
+		t.Fatal("SNS topic not registered")
+	}
+	if _, ok := r.inputs["kmsMasterKeyId"]; ok {
+		t.Error("kmsMasterKeyId should not be set without KMSKeyArn")
+	}
+}
+
+// ── NextjsSite KMS + log retention tests ─────────────────────────────────────
+
+func TestNewNextjsSite_KMSCreatesSSEConfigOnAssetsBucket(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, &NextjsSiteArgs{
+		KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+	})
+
+	if mocks.find("aws:s3/bucketServerSideEncryptionConfigurationV2:BucketServerSideEncryptionConfigurationV2") == nil {
+		t.Error("SSE-KMS config not created on assets bucket")
+	}
+}
+
+func TestNewNextjsSite_KMSGrantCreatedForSSRRole(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, &NextjsSiteArgs{
+		KMSKeyArn: pulumi.String("arn:aws:kms:us-east-1:123456789012:key/test-key"),
+	})
+
+	if mocks.find("aws:kms/grant:Grant") == nil {
+		t.Error("kms.Grant not created for KMS-encrypted NextjsSite SSR Lambda")
+	}
+}
+
+func TestNewNextjsSite_NoKMSByDefault(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, nil)
+
+	if mocks.find("aws:kms/grant:Grant") != nil {
+		t.Error("kms.Grant should not be created without KMSKeyArn")
+	}
+	if mocks.find("aws:s3/bucketServerSideEncryptionConfigurationV2:BucketServerSideEncryptionConfigurationV2") != nil {
+		t.Error("SSE config should not be created without KMSKeyArn")
+	}
+}
+
+func TestNewNextjsSite_CustomLogRetention(t *testing.T) {
+	t.Parallel()
+	mocks := runNextjsSiteTest(t, false, &NextjsSiteArgs{
+		LogRetentionDays: 90,
+	})
+
+	logs := mocks.findAll("aws:cloudwatch/logGroup:LogGroup")
+	if len(logs) == 0 {
+		t.Fatal("no log groups registered")
+	}
+	for _, lg := range logs {
+		if lg.inputs["retentionInDays"].NumberValue() != 90 {
+			t.Errorf("log group retentionInDays = %v, want 90", lg.inputs["retentionInDays"].NumberValue())
+		}
 	}
 }

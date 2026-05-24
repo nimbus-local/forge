@@ -72,3 +72,28 @@ func panicOnErr(err error, context string) {
 		panic(fmt.Sprintf("forge [%s]: %v", context, err))
 	}
 }
+
+// validLogRetentionDays are the only values accepted by the CloudWatch Logs API.
+var validLogRetentionDays = []int{1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653}
+
+// resolveLogRetention converts a user-supplied LogRetentionDays value to the
+// integer passed to cloudwatch.LogGroupArgs.RetentionInDays (0 = never expire).
+// A value of 0 returns 14 (the forge default). A value of -1 returns 0 (CloudWatch
+// "never expire"). Any other value must be in the CloudWatch allowed list.
+func resolveLogRetention(days int) int {
+	if days == 0 {
+		return 14
+	}
+	if days == -1 {
+		return 0 // CloudWatch: 0 = never expire
+	}
+	for _, v := range validLogRetentionDays {
+		if days == v {
+			return days
+		}
+	}
+	panic(fmt.Sprintf(
+		"forge: invalid LogRetentionDays %d — valid values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653, or -1 for never expire",
+		days,
+	))
+}
