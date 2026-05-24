@@ -1288,9 +1288,9 @@ func TestBuildContainerDefs_NoPort(t *testing.T) {
 func nextjsOpenNextDir(t *testing.T, withImg bool) string {
 	t.Helper()
 	if withImg {
-		return absTestdata(t, "nextjs-with-img/.open-next")
+		return absTestdata(t, "nextjs-with-img/open-next")
 	}
-	return absTestdata(t, "nextjs-no-img/.open-next")
+	return absTestdata(t, "nextjs-no-img/open-next")
 }
 
 func absTestdata(t *testing.T, rel string) string {
