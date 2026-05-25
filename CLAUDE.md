@@ -419,21 +419,24 @@ Store the suffix on `RunContext` alongside `AccountID` so constructs can access 
 
 ### Missing AWS Constructs
 
-#### `constructs/cognito.go` — Cognito User Pool
-```go
-type CognitoArgs struct {
-    SelfSignUpEnabled bool
-    // Social identity providers (e.g. "Google", "Facebook", "Apple")
-    IdentityProviders []string
-}
-func NewCognito(ctx *forge.RunContext, name string, args *CognitoArgs) *Cognito
-// LinkEnv: SST_COGNITO_<NAME>_USER_POOL_ID, SST_COGNITO_<NAME>_CLIENT_ID
-```
-Creates: Cognito User Pool + App Client. Useful for teams that need managed
-email/password or social login without a third-party auth service, or that have
-compliance requirements (SOC2, HIPAA) favouring AWS-native identity.
-Pairs well with a `checklist-cognito` example to complement the GitHub OAuth
-`checklist-full` example.
+Constructs are being added in this order (dependencies first):
+
+1. **`constructs/vpc.go`** — `NewVpc` — VPC with public/private/isolated subnets, NAT, VPC endpoints. No LinkEnv; consumed by Database, Cache, Efs, Service.
+2. **`constructs/email.go`** — `NewEmail` — SES domain or address identity + DKIM + optional configuration set. `SST_EMAIL_<NAME>_SENDER`, `SST_EMAIL_<NAME>_CONFIG_SET`. IAM: `ses:SendEmail`, `ses:SendRawEmail`.
+3. **`constructs/cognito_user_pool.go`** — `NewCognitoUserPool` — User Pool + default app client + optional Lambda triggers. `SST_COGNITO_<NAME>_USER_POOL_ID`, `SST_COGNITO_<NAME>_CLIENT_ID`.
+4. **`constructs/cognito_identity_pool.go`** — `NewCognitoIdentityPool` — Federated identity pool linking user pools to IAM roles. `SST_IDENTITY_POOL_<NAME>_ID`.
+5. **`constructs/kinesis_stream.go`** — `NewKinesisStream` — Kinesis Data Stream with optional Lambda consumers. `SST_KINESIS_<NAME>_STREAM_NAME`, `SST_KINESIS_<NAME>_STREAM_ARN`.
+6. **`constructs/bus.go`** — `NewBus` — EventBridge custom event bus with rules and Lambda/Queue targets. `SST_BUS_<NAME>_NAME`, `SST_BUS_<NAME>_ARN`. IAM: `events:PutEvents`.
+7. **`constructs/apigateway_websocket.go`** — `NewApiGatewayWebSocket` — WebSocket API with route handlers. `SST_WS_<NAME>_URL`, `SST_WS_<NAME>_MGMT_URL`. IAM: `execute-api:ManageConnections`.
+8. **`constructs/step_functions.go`** — `NewStepFunctions` — State machine (Standard or Express) from raw ASL JSON. `SST_SFN_<NAME>_ARN`, `SST_SFN_<NAME>_NAME`. IAM: `states:StartExecution`, `states:DescribeExecution`, `states:StopExecution`.
+9. **`constructs/database.go`** — `NewDatabase` — Aurora Serverless v2 or RDS Postgres/MySQL. `SST_DATABASE_<NAME>_HOST/PORT/NAME/USERNAME/SECRET_ARN/CLUSTER_ARN`. IAM: `secretsmanager:GetSecretValue`; Aurora Data API: `rds-data:*`.
+10. **`constructs/cache.go`** — `NewCache` — ElastiCache Serverless or replication group (Redis/Valkey). `SST_CACHE_<NAME>_HOST/PORT/TLS/AUTH_TOKEN`.
+11. **`constructs/efs.go`** — `NewEfs` — EFS filesystem + access point wired into Lambda mount. `SST_EFS_<NAME>_ACCESS_POINT_ARN`, `SST_EFS_<NAME>_MOUNT_PATH`. IAM: `elasticfilesystem:Client*`.
+12. **`constructs/appsync.go`** — `NewAppSync` — AppSync GraphQL API with schema, data sources, resolvers. `SST_APPSYNC_<NAME>_URL`, `SST_APPSYNC_<NAME>_API_ID`. IAM: `appsync:GraphQL`.
+13. **`constructs/opensearch.go`** — `NewOpenSearch` — OpenSearch Service domain. `SST_OPENSEARCH_<NAME>_ENDPOINT`, `SST_OPENSEARCH_<NAME>_ARN`. IAM: `es:ESHttp*`.
+14. **`constructs/apigateway_v1.go`** — `NewApiGatewayV1` — REST API Gateway (v1). `SST_APIV1_<NAME>_URL`.
+15. **`constructs/realtime.go`** — `NewRealtime` — IoT Core WebSocket endpoint for real-time pub/sub. `SST_REALTIME_<NAME>_ENDPOINT`, `SST_REALTIME_<NAME>_AUTHORIZER_ARN`.
+16. **`constructs/dsql.go`** — `NewDsql` — Aurora DSQL serverless PostgreSQL cluster (requires Pulumi AWS v7.30+ support). `SST_DSQL_<NAME>_ENDPOINT`, `SST_DSQL_<NAME>_CLUSTER_ARN`.
 
 #### `constructs/email.go` — SES Email Identity
 ```go
@@ -474,33 +477,63 @@ A magic link flow needs `NewEmail` for sending plus application code in a Lambda
 `NewDynamoDB` + `NewEmail` + `NewFunction` + `NewApiGatewayV2` is the complete
 infrastructure for a magic link auth system. No additional construct needed.
 
+### Smoke test infrastructure notes
+
+Local smoke tests run against [Nimbus](https://github.com/nimbus-local/nimbus) (`make smoke`).
+Not all AWS services are emulated. Constructs blocked on Nimbus support are unit-tested only
+until the service is added.
+
+| Construct | Nimbus support | Smoke status |
+|---|---|---|
+| `NewVpc` | ✗ EC2 not emulated | unit tests only — awaiting Nimbus EC2 support |
+| `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
+| `NewCognitoUserPool` | ✓ `cognito` | planned |
+| `NewDatabase` | ✓ `rds` | planned |
+| `NewCache` | ✓ `elasticache` | planned |
+| `NewBus` | ✓ `eventbridge` | planned |
+| `NewKinesisStream` | ✗ not emulated | unit tests only |
+
 ### Remaining roadmap items
 
-- `forge dev` tunnel verification over Nimbus SQS (request/response queues round-trip locally)
-- Aurora / RDS construct (`NewDatabase`) — RDS Postgres/MySQL + connection string injection
-- ElastiCache construct (`NewCache`) — Redis/Valkey cluster + connection string injection
+- ✅ `forge dev` tunnel — implementation complete; integration test against Nimbus in progress
+- ✅ `NewVpc` — implemented; unit tests pass; smoke blocked (Nimbus EC2 not supported)
+- ✅ `NewEmail` — implemented; unit tests pass; smoke blocked (Nimbus SESv2 not supported)
+- `NewCognitoUserPool` / `NewCognitoIdentityPool` — planned
+- `NewKinesisStream` — planned
+- `NewBus` (EventBridge) — planned
+- `NewApiGatewayWebSocket` — planned
+- `NewStepFunctions` — planned
+- `NewDatabase` (Aurora/RDS) — planned
+- `NewCache` (ElastiCache) — planned
+- `NewEfs` — planned
+- `NewAppSync` — planned
+- `NewOpenSearch` — planned
+- `NewApiGatewayV1` — planned
+- `NewRealtime` (IoT) — planned
+- `NewDsql` — planned (pending Pulumi provider support)
 - Drift detection — `forge drift` compares live AWS state against Pulumi state
 
 ---
 
 ## Dependencies
 
+Actual versions from go.mod (use `go get module@latest` to update):
+
 ```
-github.com/aws/aws-sdk-go-v2 v1.26.0
-github.com/aws/aws-sdk-go-v2/config v1.27.0
-github.com/aws/aws-sdk-go-v2/service/lambda v1.54.0
-github.com/aws/aws-sdk-go-v2/service/sqs v1.31.0
-github.com/aws/aws-sdk-go-v2/service/ssm v1.49.0
-github.com/charmbracelet/lipgloss v0.10.0
-github.com/charmbracelet/log v0.4.0
-github.com/pulumi/pulumi-aws/sdk/v6/go/aws v6.27.0
-github.com/pulumi/pulumi/sdk/v3 v3.113.0
-github.com/spf13/cobra v1.8.0
+github.com/aws/aws-sdk-go-v2 v1.41.7
+github.com/aws/aws-sdk-go-v2/config v1.32.18
+github.com/aws/aws-sdk-go-v2/service/s3 v1.101.0
+github.com/aws/aws-sdk-go-v2/service/sqs v1.42.27
+github.com/aws/aws-sdk-go-v2/service/ssm v1.68.6
+github.com/aws/aws-sdk-go-v2/service/sts v1.42.1
+github.com/charmbracelet/lipgloss v1.1.0
+github.com/pulumi/pulumi-aws/sdk/v7 v7.30.0   ← NOTE: v7, not v6
+github.com/pulumi/pulumi-cloudflare/sdk/v5 v5.49.1
+github.com/pulumi/pulumi/sdk/v3 v3.243.0
+github.com/spf13/cobra v1.10.2
 ```
 
-Pending:
-- `github.com/aws/aws-sdk-go-v2/service/rds` — Aurora/RDS construct
-- `github.com/aws/aws-sdk-go-v2/service/elasticache` — ElastiCache construct
+All new constructs must import `github.com/pulumi/pulumi-aws/sdk/v7/go/aws/...`.
 
 ---
 
@@ -521,8 +554,21 @@ Pending:
 | `new sst.aws.StaticSite("X", {...})` | `constructs.NewStaticSite(ctx, "X", &constructs.StaticSiteArgs{...})` |
 | `new sst.aws.NextjsSite("X", {...})` | `constructs.NewNextjsSite(ctx, "X", &constructs.NextjsSiteArgs{...})` |
 | `new sst.aws.Service("X", {...})` | `constructs.NewService(ctx, "X", &constructs.ServiceArgs{...})` |
-| `new sst.aws.Cognito("X", {...})` | `constructs.NewCognito(ctx, "X", &constructs.CognitoArgs{...})` |
+| `new sst.aws.Cognito("X", {...})` | `constructs.NewCognitoUserPool(ctx, "X", &constructs.CognitoUserPoolArgs{...})` |
+| `new sst.aws.CognitoIdentityPool("X", {...})` | `constructs.NewCognitoIdentityPool(ctx, "X", &constructs.CognitoIdentityPoolArgs{...})` |
 | `new sst.aws.Email("X", {...})` | `constructs.NewEmail(ctx, "X", &constructs.EmailArgs{...})` |
+| `new sst.aws.KinesisStream("X", {...})` | `constructs.NewKinesisStream(ctx, "X", &constructs.KinesisStreamArgs{...})` |
+| `new sst.aws.Bus("X", {...})` | `constructs.NewBus(ctx, "X", &constructs.BusArgs{...})` |
+| `new sst.aws.ApiGatewayWebSocket("X", {...})` | `constructs.NewApiGatewayWebSocket(ctx, "X", &constructs.ApiGatewayWebSocketArgs{...})` |
+| `new sst.aws.StepFunctions("X", {...})` | `constructs.NewStepFunctions(ctx, "X", &constructs.StepFunctionsArgs{...})` |
+| `new sst.aws.Postgres("X", {...})` | `constructs.NewDatabase(ctx, "X", &constructs.DatabaseArgs{Engine: "aurora-postgresql"})` |
+| `new sst.aws.Redis("X", {...})` | `constructs.NewCache(ctx, "X", &constructs.CacheArgs{...})` |
+| `new sst.aws.Efs("X", {...})` | `constructs.NewEfs(ctx, "X", &constructs.EfsArgs{...})` |
+| `new sst.aws.Vpc("X", {...})` | `constructs.NewVpc(ctx, "X", &constructs.VpcArgs{...})` |
+| `new sst.aws.AppSync("X", {...})` | `constructs.NewAppSync(ctx, "X", &constructs.AppSyncArgs{...})` |
+| `new sst.aws.OpenSearch("X", {...})` | `constructs.NewOpenSearch(ctx, "X", &constructs.OpenSearchArgs{...})` |
+| `new sst.aws.ApiGatewayV1("X", {...})` | `constructs.NewApiGatewayV1(ctx, "X", &constructs.ApiGatewayV1Args{...})` |
+| `new sst.aws.Realtime("X", {...})` | `constructs.NewRealtime(ctx, "X", &constructs.RealtimeArgs{...})` |
 | `new sst.cloudflare.Worker("X", {...})` | `cf.NewWorker(ctx, "X", &cf.WorkerArgs{...})` |
 | `new sst.cloudflare.KV("X")` | `cf.NewKVNamespace(ctx, "X", nil)` |
 | `new sst.cloudflare.D1("X")` | `cf.NewD1Database(ctx, "X", nil)` |
