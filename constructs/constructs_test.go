@@ -143,6 +143,47 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["arn"] = resource.NewStringProperty(
 			"arn:aws:kms:us-east-1:123456789012:alias/" + args.Name,
 		)
+
+	// ── SESv2 resources ──────────────────────────────────────────────────────
+	case "aws:sesv2/emailIdentity:EmailIdentity":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:ses:us-east-1:123456789012:identity/" + args.Name,
+		)
+		outputs["emailIdentity"] = resource.NewStringProperty(args.Inputs["emailIdentity"].StringValue())
+		outputs["identityType"] = resource.NewStringProperty("EMAIL_ADDRESS")
+		outputs["verificationStatus"] = resource.NewStringProperty("SUCCESS")
+		outputs["dkimSigningAttributes"] = resource.NewObjectProperty(resource.PropertyMap{
+			"tokens": resource.NewArrayProperty([]resource.PropertyValue{
+				resource.NewStringProperty("token1"),
+				resource.NewStringProperty("token2"),
+				resource.NewStringProperty("token3"),
+			}),
+		})
+	case "aws:sesv2/configurationSet:ConfigurationSet":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:ses:us-east-1:123456789012:configuration-set/" + args.Name,
+		)
+		outputs["configurationSetName"] = resource.NewStringProperty(args.Inputs["configurationSetName"].StringValue())
+
+	// ── EC2 / VPC resources ───────────────────────────────────────────────────
+	case "aws:ec2/vpc:Vpc":
+		outputs["cidrBlock"] = resource.NewStringProperty("10.0.0.0/16")
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/subnet:Subnet":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/internetGateway:InternetGateway":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/defaultSecurityGroup:DefaultSecurityGroup":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/routeTable:RouteTable":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/routeTableAssociation:RouteTableAssociation":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:ec2/eip:Eip":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["allocationId"] = resource.NewStringProperty(args.Name + "-alloc")
+	case "aws:ec2/natGateway:NatGateway":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 	}
 
 	m.mu.Lock()
@@ -170,6 +211,22 @@ func (m *testMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error)
 			"value":         resource.NewStringProperty("mock-secret-value"),
 			"version":       resource.NewNumberProperty(1),
 			"insecureValue": resource.NewStringProperty(""),
+		}, nil
+	}
+	// Handle EC2 AZ lookup (NewVpc).
+	if strings.Contains(args.Token, "getAvailabilityZones") {
+		return resource.PropertyMap{
+			"id": resource.NewStringProperty("mock-azs"),
+			"names": resource.NewArrayProperty([]resource.PropertyValue{
+				resource.NewStringProperty("us-east-1a"),
+				resource.NewStringProperty("us-east-1b"),
+				resource.NewStringProperty("us-east-1c"),
+			}),
+			"zoneIds": resource.NewArrayProperty([]resource.PropertyValue{
+				resource.NewStringProperty("use1-az1"),
+				resource.NewStringProperty("use1-az2"),
+				resource.NewStringProperty("use1-az3"),
+			}),
 		}, nil
 	}
 	return args.Args, nil
