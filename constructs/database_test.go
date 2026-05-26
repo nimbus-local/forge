@@ -81,8 +81,8 @@ func TestNewDatabase_PhysicalNameQualified(t *testing.T) {
 	if r == nil {
 		t.Fatal("Cluster not registered")
 	}
-	if r.inputs["clusterIdentifier"].StringValue() != "myapp-test-Db" {
-		t.Errorf("clusterIdentifier = %q, want myapp-test-Db", r.inputs["clusterIdentifier"].StringValue())
+	if r.inputs["clusterIdentifier"].StringValue() != "myapp-test-db" {
+		t.Errorf("clusterIdentifier = %q, want myapp-test-db", r.inputs["clusterIdentifier"].StringValue())
 	}
 }
 

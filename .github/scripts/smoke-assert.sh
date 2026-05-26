@@ -158,7 +158,7 @@ fi
 
 echo ""
 echo "── RDS / Aurora Serverless v2"
-check_match "cluster ${PREFIX}-Db exists" "${PREFIX}-Db" \
+check_match "cluster ${PREFIX}-db exists" "${PREFIX}-db" \
   $CLI rds describe-db-clusters
 
 # ── Step Functions ────────────────────────────────────────────────────────────

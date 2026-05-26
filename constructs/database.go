@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
@@ -101,8 +102,9 @@ func NewDatabase(ctx *forge.RunContext, name string, args *DatabaseArgs) *Databa
 	for i, id := range args.SubnetIDs {
 		subnetIDs[i] = pulumi.String(id)
 	}
+	// RDS subnet group names must be all-lowercase.
 	subnetGroup, err := rds.NewSubnetGroup(pctx, name+"-subnets", &rds.SubnetGroupArgs{
-		Name:      pulumi.String(qualifiedName(ctx, name) + "-subnets"),
+		Name:      pulumi.String(strings.ToLower(qualifiedName(ctx, name)) + "-subnets"),
 		SubnetIds: subnetIDs,
 		Tags:      tags,
 	})
@@ -115,7 +117,7 @@ func NewDatabase(ctx *forge.RunContext, name string, args *DatabaseArgs) *Databa
 	}
 
 	clusterArgs := &rds.ClusterArgs{
-		ClusterIdentifier:  pulumi.String(qualifiedName(ctx, name)),
+		ClusterIdentifier:  pulumi.String(strings.ToLower(qualifiedName(ctx, name))),
 		Engine:             pulumi.String(engine),
 		DatabaseName:       pulumi.String(dbName),
 		MasterUsername:     pulumi.String(masterUser),
@@ -147,7 +149,7 @@ func NewDatabase(ctx *forge.RunContext, name string, args *DatabaseArgs) *Databa
 
 	// Writer instance — db.serverless is required for Aurora Serverless v2.
 	_, err = rds.NewClusterInstance(pctx, name+"-writer", &rds.ClusterInstanceArgs{
-		Identifier:        pulumi.String(qualifiedName(ctx, name) + "-writer"),
+		Identifier:        pulumi.String(strings.ToLower(qualifiedName(ctx, name)) + "-writer"),
 		ClusterIdentifier: cluster.ClusterIdentifier,
 		Engine:            rds.EngineType(engine),
 		InstanceClass:     pulumi.String("db.serverless"),
