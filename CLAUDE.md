@@ -487,7 +487,7 @@ until the service is added.
 |---|---|---|
 | `NewVpc` | ✗ EC2 not emulated | unit tests only — awaiting Nimbus EC2 support |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
-| `NewCognitoUserPool` | ✓ `cognito` | planned |
+| `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
 | `NewCache` | ✓ `elasticache` | planned |
 | `NewBus` | ✓ `eventbridge` | planned |
@@ -498,7 +498,8 @@ until the service is added.
 - ✅ `forge dev` tunnel — implementation complete; integration test against Nimbus in progress
 - ✅ `NewVpc` — implemented; unit tests pass; smoke blocked (Nimbus EC2 not supported)
 - ✅ `NewEmail` — implemented; unit tests pass; smoke blocked (Nimbus SESv2 not supported)
-- `NewCognitoUserPool` / `NewCognitoIdentityPool` — planned
+- ✅ `NewCognitoUserPool` — implemented; unit tests pass; smoke planned
+- ✅ `NewCognitoIdentityPool` — implemented; unit tests pass; smoke planned
 - `NewKinesisStream` — planned
 - `NewBus` (EventBridge) — planned
 - `NewApiGatewayWebSocket` — planned

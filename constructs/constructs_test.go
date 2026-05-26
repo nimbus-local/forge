@@ -184,6 +184,23 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["allocationId"] = resource.NewStringProperty(args.Name + "-alloc")
 	case "aws:ec2/natGateway:NatGateway":
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+
+	// ── Cognito resources ─────────────────────────────────────────────────────
+	case "aws:cognito/userPool:UserPool":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:cognito-idp:us-east-1:123456789012:userpool/" + args.Name,
+		)
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["endpoint"] = resource.NewStringProperty("cognito-idp.us-east-1.amazonaws.com/" + args.Name)
+	case "aws:cognito/userPoolClient:UserPoolClient":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-client-id")
+	case "aws:cognito/identityPool:IdentityPool":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:cognito-identity:us-east-1:123456789012:identitypool/us-east-1:" + args.Name,
+		)
+		outputs["id"] = resource.NewStringProperty("us-east-1:" + args.Name)
+	case "aws:cognito/identityPoolRoleAttachment:IdentityPoolRoleAttachment":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 	}
 
 	m.mu.Lock()
@@ -211,6 +228,15 @@ func (m *testMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error)
 			"value":         resource.NewStringProperty("mock-secret-value"),
 			"version":       resource.NewNumberProperty(1),
 			"insecureValue": resource.NewStringProperty(""),
+		}, nil
+	}
+	// Handle AWS region lookup (NewCognitoIdentityPool and others).
+	if strings.Contains(args.Token, "getRegion") {
+		return resource.PropertyMap{
+			"description": resource.NewStringProperty(""),
+			"endpoint":    resource.NewStringProperty("ec2.us-east-1.amazonaws.com"),
+			"id":          resource.NewStringProperty("us-east-1"),
+			"name":        resource.NewStringProperty("us-east-1"),
 		}, nil
 	}
 	// Handle EC2 AZ lookup (NewVpc).
