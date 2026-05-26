@@ -70,6 +70,14 @@ func main() {
 				MasterPassword: "smoke-password",
 			})
 
+			// ── Cache (ElastiCache ReplicationGroup) ───────────────────────────────
+			// Nimbus provides an ElastiCache emulator — no VPC or real subnet validation.
+
+			cache := constructs.NewCache(ctx, "Cache", &constructs.CacheArgs{
+				SubnetIDs: []string{"subnet-00000001", "subnet-00000002"},
+				AuthToken: "smoke-cache-token-12345",
+			})
+
 			// ── Step Functions state machine ──────────────────────────────────
 
 			sfn := constructs.NewStepFunctions(ctx, "Workflow", &constructs.StepFunctionsArgs{
@@ -88,7 +96,7 @@ func main() {
 				Handler:          "bootstrap",
 				Code:             "../functions/handler.zip",
 				DevHandler:       "./functions/handler",
-				Link:             []forge.Linkable{table, bucket, secret, key, stream, db, sfn},
+				Link:             []forge.Linkable{table, bucket, secret, key, stream, db, sfn, cache},
 				KMSKeyArn:        key.ARN(),
 				LogRetentionDays: 30,
 			}
@@ -150,6 +158,7 @@ func main() {
 			ctx.Export("streamName", stream.Name())
 			ctx.Export("sfnArn", sfn.ARN())
 			ctx.Export("dbEndpoint", db.Endpoint())
+				ctx.Export("cacheHost", cache.PrimaryEndpoint())
 			return nil
 		},
 	})

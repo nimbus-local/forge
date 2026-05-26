@@ -87,11 +87,13 @@ func NewCache(ctx *forge.RunContext, name string, args *CacheArgs) *Cache {
 	subnetGroup, err := elasticache.NewSubnetGroup(pctx, name+"-subnets", &elasticache.SubnetGroupArgs{
 		Name:      pulumi.String(qname + "-subnets"),
 		SubnetIds: subnetIDs,
-		Tags:      tags,
 	})
 	panicOnErr(err, name+": cache subnet group")
 
 	// Parameter group — sets cluster-enabled=no (non-sharded mode).
+	// Tags are intentionally omitted from SubnetGroup and ParameterGroup because
+	// ElastiCache's AddTagsToResource API is not universally supported and these
+	// are internal supporting resources; only the ReplicationGroup carries forge tags.
 	family := cacheFamily(engine, engineVersion)
 	paramGroup, err := elasticache.NewParameterGroup(pctx, name+"-params", &elasticache.ParameterGroupArgs{
 		Name:   pulumi.String(qname + "-params"),
@@ -102,7 +104,6 @@ func NewCache(ctx *forge.RunContext, name string, args *CacheArgs) *Cache {
 				Value: pulumi.String("no"),
 			},
 		},
-		Tags: tags,
 	})
 	panicOnErr(err, name+": cache parameter group")
 
