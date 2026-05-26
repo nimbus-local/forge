@@ -185,6 +185,23 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 	case "aws:ec2/natGateway:NatGateway":
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 
+	// ── EventBridge resources ─────────────────────────────────────────────────
+	case "aws:cloudwatch/eventBus:EventBus":
+		name := str("name")
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:events:us-east-1:123456789012:event-bus/" + name,
+		)
+		outputs["name"] = resource.NewStringProperty(name)
+	case "aws:cloudwatch/eventRule:EventRule":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:events:us-east-1:123456789012:rule/" + args.Name,
+		)
+		outputs["name"] = resource.NewStringProperty(args.Inputs["name"].StringValue())
+	case "aws:cloudwatch/eventTarget:EventTarget":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:sqs/queuePolicy:QueuePolicy":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+
 	// ── Kinesis resources ─────────────────────────────────────────────────────
 	case "aws:kinesis/stream:Stream":
 		name := str("name")

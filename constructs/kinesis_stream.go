@@ -6,8 +6,8 @@ import (
 
 	forge "github.com/nimbus-local/forge"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
-	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/kinesis"
+	awslambda "github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lambda"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -125,12 +125,12 @@ func NewKinesisStream(ctx *forge.RunContext, name string, args *KinesisStreamArg
 		panicOnErr(err, consumerName+": kinesis consume policy")
 
 		esmArgs := &awslambda.EventSourceMappingArgs{
-			EventSourceArn:                  stream.Arn,
-			FunctionName:                    fn.ARN(),
-			StartingPosition:                pulumi.String("LATEST"),
-			BatchSize:                       pulumi.Int(args.BatchSize),
-			BisectBatchOnFunctionError:      pulumi.Bool(args.BisectOnError),
-			FunctionResponseTypes:           pulumi.StringArray{pulumi.String("ReportBatchItemFailures")},
+			EventSourceArn:             stream.Arn,
+			FunctionName:               fn.ARN(),
+			StartingPosition:           pulumi.String("LATEST"),
+			BatchSize:                  pulumi.Int(args.BatchSize),
+			BisectBatchOnFunctionError: pulumi.Bool(args.BisectOnError),
+			FunctionResponseTypes:      pulumi.StringArray{pulumi.String("ReportBatchItemFailures")},
 		}
 
 		_, err = awslambda.NewEventSourceMapping(pctx, consumerName+"-esm", esmArgs)

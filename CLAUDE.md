@@ -490,7 +490,7 @@ until the service is added.
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
 | `NewCache` | ✓ `elasticache` | planned |
-| `NewBus` | ✓ `eventbridge` | planned |
+| `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
 
 ### Remaining roadmap items
@@ -501,7 +501,7 @@ until the service is added.
 - ✅ `NewCognitoUserPool` — implemented; unit tests pass; smoke planned
 - ✅ `NewCognitoIdentityPool` — implemented; unit tests pass; smoke planned
 - ✅ `NewKinesisStream` — implemented; unit tests pass; smoke added
-- `NewBus` (EventBridge) — planned
+- ✅ `NewBus` — implemented; unit tests pass; smoke planned
 - `NewApiGatewayWebSocket` — planned
 - `NewStepFunctions` — planned
 - `NewDatabase` (Aurora/RDS) — planned
