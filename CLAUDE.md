@@ -488,7 +488,7 @@ until the service is added.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
-| `NewVpc` | ✗ EC2 not emulated | unit tests only — awaiting Nimbus EC2 support |
+| `NewVpc` | ✗ EC2 mostly not emulated (only DescribeSubnets stub) | unit tests only — awaiting full Nimbus EC2 support |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
