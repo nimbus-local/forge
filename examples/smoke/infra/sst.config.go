@@ -62,6 +62,25 @@ func main() {
 				Default: "smoke-default",
 			})
 
+			// ── Database (Aurora Serverless v2) ───────────────────────────────
+			// Nimbus provides a real Postgres sidecar — no VPC or subnet validation.
+
+			db := constructs.NewDatabase(ctx, "Db", &constructs.DatabaseArgs{
+				SubnetIDs:      []string{"subnet-00000001", "subnet-00000002"},
+				MasterPassword: "smoke-password",
+			})
+
+			// ── Step Functions state machine ──────────────────────────────────
+
+			sfn := constructs.NewStepFunctions(ctx, "Workflow", &constructs.StepFunctionsArgs{
+				Definition: `{
+					"StartAt": "Done",
+					"States": {
+						"Done": {"Type": "Succeed"}
+					}
+				}`,
+			})
+
 			// ── Handler function args (reused by Queue, Topic, and Cron) ──────
 			// Each construct that receives handlerArgs creates its own Lambda function.
 
@@ -69,7 +88,7 @@ func main() {
 				Handler:          "bootstrap",
 				Code:             "../functions/handler.zip",
 				DevHandler:       "./functions/handler",
-				Link:             []forge.Linkable{table, bucket, secret, key, stream},
+				Link:             []forge.Linkable{table, bucket, secret, key, stream, db, sfn},
 				KMSKeyArn:        key.ARN(),
 				LogRetentionDays: 30,
 			}
@@ -96,17 +115,6 @@ func main() {
 			topic := constructs.NewTopic(ctx, "Alerts", &constructs.TopicArgs{
 				Subscribers: []*constructs.FunctionArgs{handlerArgs},
 				KMSKeyArn:   key.ARN(),
-			})
-
-			// ── Step Functions state machine ──────────────────────────────────
-
-			sfn := constructs.NewStepFunctions(ctx, "Workflow", &constructs.StepFunctionsArgs{
-				Definition: `{
-					"StartAt": "Done",
-					"States": {
-						"Done": {"Type": "Succeed"}
-					}
-				}`,
 			})
 
 			// ── Cron job (every 5 minutes) ────────────────────────────────────
@@ -141,6 +149,7 @@ func main() {
 			ctx.Export("kmsKeyArn", key.ARN())
 			ctx.Export("streamName", stream.Name())
 			ctx.Export("sfnArn", sfn.ARN())
+			ctx.Export("dbEndpoint", db.Endpoint())
 			return nil
 		},
 	})

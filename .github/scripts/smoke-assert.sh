@@ -112,7 +112,14 @@ for key in \
   SST_BUCKET_ASSETS_ARN \
   SST_SECRET_APP_SECRET \
   SST_KINESIS_STREAM_STREAM_NAME \
-  SST_KINESIS_STREAM_STREAM_ARN; do
+  SST_KINESIS_STREAM_STREAM_ARN \
+  SST_DATABASE_DB_HOST \
+  SST_DATABASE_DB_PORT \
+  SST_DATABASE_DB_NAME \
+  SST_DATABASE_DB_USERNAME \
+  SST_DATABASE_DB_CLUSTER_ARN \
+  SST_SFN_WORKFLOW_ARN \
+  SST_SFN_WORKFLOW_NAME; do
   if echo "$ENV_JSON" | grep -q "\"${key}\""; then
     ok "env ${key} injected"
   else
@@ -146,6 +153,13 @@ else
   fail "HTTP API ${PREFIX}-Api not found" \
     "check: $CLI apigatewayv2 get-apis"
 fi
+
+# ── RDS / Aurora ──────────────────────────────────────────────────────────────
+
+echo ""
+echo "── RDS / Aurora Serverless v2"
+check_match "cluster ${PREFIX}-db exists" "${PREFIX}-db" \
+  $CLI rds describe-db-clusters
 
 # ── Step Functions ────────────────────────────────────────────────────────────
 
