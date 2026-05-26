@@ -492,6 +492,7 @@ until the service is added.
 | `NewCache` | ✓ `elasticache` | planned |
 | `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
+| `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
 
 ### Remaining roadmap items
 
@@ -502,7 +503,7 @@ until the service is added.
 - ✅ `NewCognitoIdentityPool` — implemented; unit tests pass; smoke planned
 - ✅ `NewKinesisStream` — implemented; unit tests pass; smoke added
 - ✅ `NewBus` — implemented; unit tests pass; smoke planned
-- `NewApiGatewayWebSocket` — planned
+- ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
 - `NewStepFunctions` — planned
 - `NewDatabase` (Aurora/RDS) — planned
 - `NewCache` (ElastiCache) — planned
