@@ -483,13 +483,17 @@ Local smoke tests run against [Nimbus](https://github.com/nimbus-local/nimbus) (
 Not all AWS services are emulated. Constructs blocked on Nimbus support are unit-tested only
 until the service is added.
 
+**Known Nimbus gaps (as of 2026-05-26):**
+- `elasticache:AddTagsToResource` — returns HTTP 200 but with malformed XML body (`AddTagsToResourceResult node not found`). Pulumi's AWS provider fails to parse the response when trying to sync tags on existing ElastiCache SubnetGroup and ParameterGroup resources. Workaround: do not pass `Tags` to ElastiCache SubnetGroup and ParameterGroup (only tag the ReplicationGroup). Track at nimbus-local/nimbus.
+
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
-| `NewVpc` | ✗ EC2 not emulated | unit tests only — awaiting Nimbus EC2 support |
+| `NewVpc` | ✗ EC2 mostly not emulated (only DescribeSubnets stub) | unit tests only — awaiting full Nimbus EC2 support |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
-| `NewCache` | ✓ `elasticache` | planned |
+| `NewCache` | ✓ `elasticache` (partial — `AddTagsToResource` unimplemented) | smoke added (SubnetGroup/ParameterGroup untagged as workaround) |
+| `NewEfs` | ✓ `efs` | smoke added |
 | `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
@@ -508,8 +512,8 @@ until the service is added.
 - ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
 - ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
 - ✅ `NewDatabase` (Aurora Serverless v2) — implemented; unit tests pass; smoke added
-- `NewCache` (ElastiCache) — planned
-- `NewEfs` — planned
+- ✅ `NewCache` (ElastiCache ReplicationGroup, Redis/Valkey) — implemented; unit tests pass; smoke planned
+- ✅ `NewEfs` — implemented; unit tests pass; smoke added
 - `NewAppSync` — planned
 - `NewOpenSearch` — planned
 - `NewApiGatewayV1` — planned

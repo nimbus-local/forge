@@ -62,6 +62,14 @@ type FunctionArgs struct {
 	// Valid non-zero values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731,
 	// 1096, 1827, 2192, 2557, 2922, 3288, 3653.
 	LogRetentionDays int
+	// VpcSubnetIDs places the Lambda inside a VPC. Required when EfsMount is set.
+	// The execution role automatically receives AWSLambdaVPCAccessExecutionRole.
+	VpcSubnetIDs []string
+	// VpcSecurityGroupIDs restricts Lambda VPC egress. Provide alongside VpcSubnetIDs.
+	VpcSecurityGroupIDs []string
+	// EfsMount wires an EFS access point into the Lambda. VpcSubnetIDs must also be set
+	// to subnets that contain the EFS mount targets.
+	EfsMount *Efs
 }
 
 // NewFunction creates a Lambda function construct.
@@ -86,9 +94,21 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 		return newFunctionDev(ctx, name, args)
 	}
 
+	if args.EfsMount != nil && len(args.VpcSubnetIDs) == 0 {
+		panic(fmt.Sprintf("NewFunction %q: VpcSubnetIDs is required when EfsMount is set", name))
+	}
+
 	pctx := ctx.Pulumi()
 
 	// ── IAM role ─────────────────────────────────────────────────────────────
+	managedPolicies := pulumi.StringArray{
+		pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
+	}
+	if len(args.VpcSubnetIDs) > 0 {
+		managedPolicies = append(managedPolicies,
+			pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"),
+		)
+	}
 	role, err := iam.NewRole(pctx, name+"-role", &iam.RoleArgs{
 		AssumeRolePolicy: pulumi.String(`{
 			"Version": "2012-10-17",
@@ -98,10 +118,8 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 				"Action": "sts:AssumeRole"
 			}]
 		}`),
-		ManagedPolicyArns: pulumi.StringArray{
-			pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
-		},
-		Tags: defaultTags(ctx, name),
+		ManagedPolicyArns: managedPolicies,
+		Tags:              defaultTags(ctx, name),
 	})
 	panicOnErr(err, name+": iam role")
 
@@ -167,6 +185,26 @@ func NewFunction(ctx *forge.RunContext, name string, args *FunctionArgs) *Functi
 	}
 	if args.KMSKeyArn != nil {
 		fnArgs.KmsKeyArn = args.KMSKeyArn
+	}
+	if len(args.VpcSubnetIDs) > 0 {
+		subnetIDs := make(pulumi.StringArray, len(args.VpcSubnetIDs))
+		for i, id := range args.VpcSubnetIDs {
+			subnetIDs[i] = pulumi.String(id)
+		}
+		sgIDs := make(pulumi.StringArray, len(args.VpcSecurityGroupIDs))
+		for i, id := range args.VpcSecurityGroupIDs {
+			sgIDs[i] = pulumi.String(id)
+		}
+		fnArgs.VpcConfig = &awslambda.FunctionVpcConfigArgs{
+			SubnetIds:        subnetIDs,
+			SecurityGroupIds: sgIDs,
+		}
+	}
+	if args.EfsMount != nil {
+		fnArgs.FileSystemConfig = &awslambda.FunctionFileSystemConfigArgs{
+			Arn:            args.EfsMount.AccessPointARN(),
+			LocalMountPath: pulumi.String(args.EfsMount.MountPath()),
+		}
 	}
 
 	fn, err := awslambda.NewFunction(pctx, name, fnArgs)

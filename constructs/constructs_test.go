@@ -249,6 +249,37 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 		outputs["endpoint"] = resource.NewStringProperty(args.Name + ".us-east-1.rds.amazonaws.com")
 
+	// ── ElastiCache resources ─────────────────────────────────────────────────
+	case "aws:elasticache/subnetGroup:SubnetGroup":
+		outputs["name"] = resource.NewStringProperty(args.Name)
+	case "aws:elasticache/parameterGroup:ParameterGroup":
+		outputs["name"] = resource.NewStringProperty(args.Name)
+	case "aws:elasticache/replicationGroup:ReplicationGroup":
+		id := str("replicationGroupId")
+		outputs["replicationGroupId"] = resource.NewStringProperty(id)
+		outputs["primaryEndpointAddress"] = resource.NewStringProperty(id + ".cache.amazonaws.com")
+		outputs["configurationEndpointAddress"] = resource.NewStringProperty(id + ".cfg.cache.amazonaws.com")
+		outputs["port"] = resource.NewNumberProperty(6379)
+		outputs["clusterEnabled"] = resource.NewBoolProperty(false)
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:elasticache:us-east-1:123456789012:replicationgroup:" + id,
+		)
+
+	// ── EFS resources ─────────────────────────────────────────────────────────
+	case "aws:efs/fileSystem:FileSystem":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/" + args.Name,
+		)
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+	case "aws:efs/mountTarget:MountTarget":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["mountTargetDnsName"] = resource.NewStringProperty(args.Name + ".efs.us-east-1.amazonaws.com")
+	case "aws:efs/accessPoint:AccessPoint":
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/" + args.Name,
+		)
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+
 	// ── Step Functions resources ───────────────────────────────────────────────
 	case "aws:sfn/stateMachine:StateMachine":
 		name := str("name")
