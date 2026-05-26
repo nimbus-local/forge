@@ -491,7 +491,7 @@ until the service is added.
 | `NewDatabase` | ✓ `rds` | planned |
 | `NewCache` | ✓ `elasticache` | planned |
 | `NewBus` | ✓ `eventbridge` | planned |
-| `NewKinesisStream` | ✗ not emulated | unit tests only |
+| `NewKinesisStream` | ✓ `kinesis` | smoke added |
 
 ### Remaining roadmap items
 
@@ -500,7 +500,7 @@ until the service is added.
 - ✅ `NewEmail` — implemented; unit tests pass; smoke blocked (Nimbus SESv2 not supported)
 - ✅ `NewCognitoUserPool` — implemented; unit tests pass; smoke planned
 - ✅ `NewCognitoIdentityPool` — implemented; unit tests pass; smoke planned
-- `NewKinesisStream` — planned
+- ✅ `NewKinesisStream` — implemented; unit tests pass; smoke added
 - `NewBus` (EventBridge) — planned
 - `NewApiGatewayWebSocket` — planned
 - `NewStepFunctions` — planned
