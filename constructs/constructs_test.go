@@ -227,6 +227,28 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 	case "aws:cognito/identityPoolRoleAttachment:IdentityPoolRoleAttachment":
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 
+	// ── RDS resources ─────────────────────────────────────────────────────────
+	case "aws:rds/subnetGroup:SubnetGroup":
+		outputs["name"] = resource.NewStringProperty(args.Name)
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:rds:us-east-1:123456789012:subgrp:" + args.Name,
+		)
+	case "aws:rds/cluster:Cluster":
+		name := str("clusterIdentifier")
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:rds:us-east-1:123456789012:cluster:" + name,
+		)
+		outputs["clusterIdentifier"] = resource.NewStringProperty(name)
+		outputs["endpoint"] = resource.NewStringProperty(name + ".cluster.us-east-1.rds.amazonaws.com")
+		outputs["readerEndpoint"] = resource.NewStringProperty(name + ".cluster-ro.us-east-1.rds.amazonaws.com")
+		outputs["port"] = resource.NewNumberProperty(5432)
+		outputs["databaseName"] = resource.NewStringProperty(str("databaseName"))
+		outputs["masterUsername"] = resource.NewStringProperty(str("masterUsername"))
+		outputs["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{})
+	case "aws:rds/clusterInstance:ClusterInstance":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["endpoint"] = resource.NewStringProperty(args.Name + ".us-east-1.rds.amazonaws.com")
+
 	// ── Step Functions resources ───────────────────────────────────────────────
 	case "aws:sfn/stateMachine:StateMachine":
 		name := str("name")

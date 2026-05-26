@@ -494,6 +494,7 @@ until the service is added.
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
 | `NewStepFunctions` | ✓ `sfn` | smoke added |
+| `NewDatabase` | ✓ `rds` | smoke added |
 
 ### Remaining roadmap items
 
@@ -506,7 +507,7 @@ until the service is added.
 - ✅ `NewBus` — implemented; unit tests pass; smoke planned
 - ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
 - ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
-- `NewDatabase` (Aurora/RDS) — planned
+- ✅ `NewDatabase` (Aurora Serverless v2) — implemented; unit tests pass; smoke added
 - `NewCache` (ElastiCache) — planned
 - `NewEfs` — planned
 - `NewAppSync` — planned

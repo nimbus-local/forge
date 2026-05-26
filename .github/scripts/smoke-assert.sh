@@ -147,6 +147,13 @@ else
     "check: $CLI apigatewayv2 get-apis"
 fi
 
+# ── RDS / Aurora ──────────────────────────────────────────────────────────────
+
+echo ""
+echo "── RDS / Aurora Serverless v2"
+check_match "cluster ${PREFIX}-Db exists" "${PREFIX}-Db" \
+  $CLI rds describe-db-clusters
+
 # ── Step Functions ────────────────────────────────────────────────────────────
 
 echo ""

@@ -98,6 +98,14 @@ func main() {
 				KMSKeyArn:   key.ARN(),
 			})
 
+			// ── Database (Aurora Serverless v2) ───────────────────────────────
+			// Nimbus provides a real Postgres sidecar — no VPC or subnet validation.
+
+			db := constructs.NewDatabase(ctx, "Db", &constructs.DatabaseArgs{
+				SubnetIDs:      []string{"subnet-00000001", "subnet-00000002"},
+				MasterPassword: "smoke-password",
+			})
+
 			// ── Step Functions state machine ──────────────────────────────────
 
 			sfn := constructs.NewStepFunctions(ctx, "Workflow", &constructs.StepFunctionsArgs{
@@ -141,6 +149,7 @@ func main() {
 			ctx.Export("kmsKeyArn", key.ARN())
 			ctx.Export("streamName", stream.Name())
 			ctx.Export("sfnArn", sfn.ARN())
+			ctx.Export("dbEndpoint", db.Endpoint())
 			return nil
 		},
 	})
