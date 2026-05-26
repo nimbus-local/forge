@@ -249,6 +249,22 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
 		outputs["endpoint"] = resource.NewStringProperty(args.Name + ".us-east-1.rds.amazonaws.com")
 
+	// ── ElastiCache resources ─────────────────────────────────────────────────
+	case "aws:elasticache/subnetGroup:SubnetGroup":
+		outputs["name"] = resource.NewStringProperty(args.Name)
+	case "aws:elasticache/parameterGroup:ParameterGroup":
+		outputs["name"] = resource.NewStringProperty(args.Name)
+	case "aws:elasticache/replicationGroup:ReplicationGroup":
+		id := str("replicationGroupId")
+		outputs["replicationGroupId"] = resource.NewStringProperty(id)
+		outputs["primaryEndpointAddress"] = resource.NewStringProperty(id + ".cache.amazonaws.com")
+		outputs["configurationEndpointAddress"] = resource.NewStringProperty(id + ".cfg.cache.amazonaws.com")
+		outputs["port"] = resource.NewNumberProperty(6379)
+		outputs["clusterEnabled"] = resource.NewBoolProperty(false)
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:elasticache:us-east-1:123456789012:replicationgroup:" + id,
+		)
+
 	// ── Step Functions resources ───────────────────────────────────────────────
 	case "aws:sfn/stateMachine:StateMachine":
 		name := str("name")

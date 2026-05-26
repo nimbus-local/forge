@@ -508,7 +508,7 @@ until the service is added.
 - ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
 - ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
 - ✅ `NewDatabase` (Aurora Serverless v2) — implemented; unit tests pass; smoke added
-- `NewCache` (ElastiCache) — planned
+- ✅ `NewCache` (ElastiCache ReplicationGroup, Redis/Valkey) — implemented; unit tests pass; smoke planned
 - `NewEfs` — planned
 - `NewAppSync` — planned
 - `NewOpenSearch` — planned
