@@ -98,6 +98,17 @@ func main() {
 				KMSKeyArn:   key.ARN(),
 			})
 
+			// ── Step Functions state machine ──────────────────────────────────
+
+			sfn := constructs.NewStepFunctions(ctx, "Workflow", &constructs.StepFunctionsArgs{
+				Definition: `{
+					"StartAt": "Done",
+					"States": {
+						"Done": {"Type": "Succeed"}
+					}
+				}`,
+			})
+
 			// ── Cron job (every 5 minutes) ────────────────────────────────────
 
 			constructs.NewCron(ctx, "Heartbeat", &constructs.CronArgs{
@@ -129,6 +140,7 @@ func main() {
 			ctx.Export("tableName", table.TableName())
 			ctx.Export("kmsKeyArn", key.ARN())
 			ctx.Export("streamName", stream.Name())
+			ctx.Export("sfnArn", sfn.ARN())
 			return nil
 		},
 	})

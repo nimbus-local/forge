@@ -147,6 +147,13 @@ else
     "check: $CLI apigatewayv2 get-apis"
 fi
 
+# ── Step Functions ────────────────────────────────────────────────────────────
+
+echo ""
+echo "── Step Functions"
+check_match "state machine ${PREFIX}-Workflow exists" "${PREFIX}-Workflow" \
+  $CLI stepfunctions list-state-machines
+
 # ── EventBridge Scheduler ─────────────────────────────────────────────────────
 
 echo ""
