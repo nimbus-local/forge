@@ -50,6 +50,10 @@ func main() {
 				LifecycleDays: 90,
 			})
 
+			// ── Kinesis stream (created before handlerArgs so it can be linked) ─
+
+			stream := constructs.NewKinesisStream(ctx, "Stream", nil)
+
 			// ── Secrets ───────────────────────────────────────────────────────
 			// Override with a real value for production:
 			//   forge secret set AppSecret <value>
@@ -65,7 +69,7 @@ func main() {
 				Handler:          "bootstrap",
 				Code:             "../functions/handler.zip",
 				DevHandler:       "./functions/handler",
-				Link:             []forge.Linkable{table, bucket, secret, key},
+				Link:             []forge.Linkable{table, bucket, secret, key, stream},
 				KMSKeyArn:        key.ARN(),
 				LogRetentionDays: 30,
 			}
@@ -124,6 +128,7 @@ func main() {
 			ctx.Export("bucketName", bucket.Name())
 			ctx.Export("tableName", table.TableName())
 			ctx.Export("kmsKeyArn", key.ARN())
+			ctx.Export("streamName", stream.Name())
 			return nil
 		},
 	})

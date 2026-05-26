@@ -79,6 +79,13 @@ echo "── SNS"
 check_match "topic ${PREFIX}-Alerts exists" "${PREFIX}-Alerts" \
   $CLI sns list-topics
 
+# ── Kinesis ───────────────────────────────────────────────────────────────────
+
+echo ""
+echo "── Kinesis Data Stream"
+check "stream ${PREFIX}-Stream exists" \
+  $CLI kinesis describe-stream --stream-name "${PREFIX}-Stream"
+
 # ── Lambda ────────────────────────────────────────────────────────────────────
 
 echo ""
@@ -103,7 +110,9 @@ for key in \
   SST_TABLE_RECORDS_ARN \
   SST_BUCKET_ASSETS_NAME \
   SST_BUCKET_ASSETS_ARN \
-  SST_SECRET_APP_SECRET; do
+  SST_SECRET_APP_SECRET \
+  SST_KINESIS_STREAM_STREAM_NAME \
+  SST_KINESIS_STREAM_STREAM_ARN; do
   if echo "$ENV_JSON" | grep -q "\"${key}\""; then
     ok "env ${key} injected"
   else
