@@ -226,6 +226,15 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		outputs["id"] = resource.NewStringProperty("us-east-1:" + args.Name)
 	case "aws:cognito/identityPoolRoleAttachment:IdentityPoolRoleAttachment":
 		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+
+	// ── Step Functions resources ───────────────────────────────────────────────
+	case "aws:sfn/stateMachine:StateMachine":
+		name := str("name")
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:states:us-east-1:123456789012:stateMachine:" + name,
+		)
+		outputs["name"] = resource.NewStringProperty(name)
+		outputs["status"] = resource.NewStringProperty("ACTIVE")
 	}
 
 	m.mu.Lock()

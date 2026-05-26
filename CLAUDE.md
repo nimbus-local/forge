@@ -493,6 +493,7 @@ until the service is added.
 | `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
+| `NewStepFunctions` | ✓ `sfn` | smoke added |
 
 ### Remaining roadmap items
 
@@ -504,7 +505,7 @@ until the service is added.
 - ✅ `NewKinesisStream` — implemented; unit tests pass; smoke added
 - ✅ `NewBus` — implemented; unit tests pass; smoke planned
 - ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
-- `NewStepFunctions` — planned
+- ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
 - `NewDatabase` (Aurora/RDS) — planned
 - `NewCache` (ElastiCache) — planned
 - `NewEfs` — planned
