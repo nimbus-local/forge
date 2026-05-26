@@ -493,7 +493,7 @@ until the service is added.
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
 | `NewCache` | ✓ `elasticache` (partial — `AddTagsToResource` unimplemented) | smoke added (SubnetGroup/ParameterGroup untagged as workaround) |
-| `NewEfs` | ✗ EFS not emulated | unit tests only — awaiting Nimbus EFS support |
+| `NewEfs` | ✓ `efs` | smoke added |
 | `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
@@ -513,7 +513,7 @@ until the service is added.
 - ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
 - ✅ `NewDatabase` (Aurora Serverless v2) — implemented; unit tests pass; smoke added
 - ✅ `NewCache` (ElastiCache ReplicationGroup, Redis/Valkey) — implemented; unit tests pass; smoke planned
-- ✅ `NewEfs` — implemented; unit tests pass; smoke blocked (Nimbus EFS not emulated)
+- ✅ `NewEfs` — implemented; unit tests pass; smoke added
 - `NewAppSync` — planned
 - `NewOpenSearch` — planned
 - `NewApiGatewayV1` — planned

@@ -70,12 +70,19 @@ func main() {
 				MasterPassword: "smoke-password",
 			})
 
-			// ── Cache (ElastiCache ReplicationGroup) ───────────────────────────────
+			// ── Cache (ElastiCache ReplicationGroup) ─────────────────────────────
 			// Nimbus provides an ElastiCache emulator — no VPC or real subnet validation.
 
 			cache := constructs.NewCache(ctx, "Cache", &constructs.CacheArgs{
 				SubnetIDs: []string{"subnet-00000001", "subnet-00000002"},
 				AuthToken: "smoke-cache-token-12345",
+			})
+
+			// ── EFS filesystem + access point ─────────────────────────────────────
+			// Nimbus provides an EFS emulator — no VPC or real subnet validation.
+
+			efsFS := constructs.NewEfs(ctx, "Shared", &constructs.EfsArgs{
+				SubnetIDs: []string{"subnet-00000001", "subnet-00000002"},
 			})
 
 			// ── Step Functions state machine ──────────────────────────────────
@@ -96,7 +103,7 @@ func main() {
 				Handler:          "bootstrap",
 				Code:             "../functions/handler.zip",
 				DevHandler:       "./functions/handler",
-				Link:             []forge.Linkable{table, bucket, secret, key, stream, db, sfn, cache},
+				Link:             []forge.Linkable{table, bucket, secret, key, stream, db, sfn, cache, efsFS},
 				KMSKeyArn:        key.ARN(),
 				LogRetentionDays: 30,
 			}
@@ -158,7 +165,8 @@ func main() {
 			ctx.Export("streamName", stream.Name())
 			ctx.Export("sfnArn", sfn.ARN())
 			ctx.Export("dbEndpoint", db.Endpoint())
-				ctx.Export("cacheHost", cache.PrimaryEndpoint())
+			ctx.Export("cacheHost", cache.PrimaryEndpoint())
+			ctx.Export("efsAccessPointArn", efsFS.AccessPointARN())
 			return nil
 		},
 	})
