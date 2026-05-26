@@ -191,6 +191,20 @@ for key in \
   fi
 done
 
+# ── EFS link injection ───────────────────────────────────────────────────────
+
+echo ""
+echo "── Link injection (EFS env vars in Handler Lambda)"
+for key in \
+  SST_EFS_SHARED_ACCESS_POINT_ARN \
+  SST_EFS_SHARED_MOUNT_PATH; do
+  if echo "$ENV_JSON" | grep -q "\"${key}\""; then
+    ok "env ${key} injected"
+  else
+    fail "env ${key} missing" "env dump: ${ENV_JSON}"
+  fi
+done
+
 # ── EventBridge Scheduler ─────────────────────────────────────────────────────
 
 echo ""
