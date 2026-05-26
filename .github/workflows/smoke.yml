@@ -17,14 +17,16 @@ env:
   PULUMI_CONFIG_PASSPHRASE: ""
 
 jobs:
-  smoke:
-    name: Smoke — deploy against Nimbus
+  # ── Build ────────────────────────────────────────────────────────────────────
+  # Compile once; both smoke jobs download the same artifacts.
+
+  build:
+    name: Build forge + smoke handler
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v6
 
-      # Cache both the root and the smoke infra module dependencies.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -34,6 +36,68 @@ jobs:
             examples/smoke/go.sum
             examples/smoke/infra/go.sum
 
+      # Verify the stub compiles for linux/amd64 (used by `forge dev`).
+      - name: Verify forge-stub compiles
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/forge-stub/
+
+      - name: Build forge CLI
+        run: go build -o forge ./cmd/forge
+
+      # Cross-compile for ARM64 Linux (Lambda runtime) and zip.
+      - name: Build smoke Lambda handler
+        working-directory: examples/smoke
+        run: |
+          GOARCH=arm64 GOOS=linux CGO_ENABLED=0 \
+            go build -o bootstrap ./functions/handler
+          zip -j functions/handler.zip bootstrap
+          rm bootstrap
+
+      - name: Upload forge binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-binary
+          path: forge
+
+      - name: Upload smoke handler
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-handler
+          path: examples/smoke/functions/handler.zip
+
+  # ── Smoke: full deploy ────────────────────────────────────────────────────────
+  # Exercises every construct via deploy → assert → remove.
+
+  smoke:
+    name: Smoke — deploy against Nimbus
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/smoke/go.sum
+            examples/smoke/infra/go.sum
+
+      - name: Download forge binary
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-binary
+
+      - name: Download smoke handler
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-handler
+          path: examples/smoke/functions
+
+      - name: Make forge executable
+        run: chmod +x forge
+
       # Cache the Pulumi AWS provider plugin so the ~100 MB download only happens
       # when the plugin version in forge.go changes.
       - name: Cache Pulumi plugins
@@ -42,7 +106,7 @@ jobs:
           path: ~/.pulumi/plugins
           key: pulumi-plugins-aws-v7.30.0
 
-      # ── Nimbus ────────────────────────────────────────────────────────────────
+      # ── Nimbus ──────────────────────────────────────────────────────────────
       # Nimbus proxies DynamoDB requests to the official amazon/dynamodb-local
       # image on a shared Docker network.
 
@@ -71,25 +135,7 @@ jobs:
           done
           echo " ready"
 
-      # ── Build ─────────────────────────────────────────────────────────────────
-
-      # Verify the stub compiles for linux/amd64 (used by `forge dev`).
-      - name: Verify forge-stub compiles
-        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/forge-stub/
-
-      - name: Build forge CLI
-        run: go build -o forge ./cmd/forge
-
-      # Cross-compile for ARM64 Linux (Lambda runtime) and zip.
-      - name: Build smoke Lambda handler
-        working-directory: examples/smoke
-        run: |
-          GOARCH=arm64 GOOS=linux CGO_ENABLED=0 \
-            go build -o bootstrap ./functions/handler
-          zip -j functions/handler.zip bootstrap
-          rm bootstrap
-
-      # ── Seed ──────────────────────────────────────────────────────────────────
+      # ── Seed ────────────────────────────────────────────────────────────────
       # NewSecret panics at deploy time if the SSM parameter is missing and no
       # Default is set. Pre-seed it so deploy succeeds without modifying the example.
 
@@ -101,20 +147,20 @@ jobs:
             --type SecureString \
             --overwrite
 
-      # ── Deploy ────────────────────────────────────────────────────────────────
+      # ── Deploy ──────────────────────────────────────────────────────────────
 
       - name: Deploy smoke stack
         id: deploy
         working-directory: examples/smoke
         run: ../../forge deploy --stage ci
 
-      # ── Assert ────────────────────────────────────────────────────────────────
+      # ── Assert ──────────────────────────────────────────────────────────────
 
       - name: Assert every construct created its resources
         if: steps.deploy.outcome == 'success'
         run: .github/scripts/smoke-assert.sh
 
-      # ── Cleanup ───────────────────────────────────────────────────────────────
+      # ── Cleanup ─────────────────────────────────────────────────────────────
 
       - name: Remove smoke stack
         if: always()
@@ -125,13 +171,80 @@ jobs:
         continue-on-error: true
         run: ../../forge remove --stage ci
 
-      # ── Dev tunnel smoke ──────────────────────────────────────────────────────
-      # Run `forge dev` against a separate stage (ci-dev) to verify:
-      #   - forge-stub is cross-compiled and deployed correctly
-      #   - shared SQS dev queues are created
-      #   - stub Lambda env vars contain FORGE_REQUEST_QUEUE_URL
-      # The tunnel sits idle (Nimbus doesn't invoke Lambda), so we kill it
-      # after the deployment completes.
+      - name: Stop Nimbus
+        if: always()
+        run: |
+          docker rm -f nimbus dynamodb-local 2>/dev/null || true
+          docker network rm nimbus-net 2>/dev/null || true
+
+  # ── Smoke: dev tunnel ─────────────────────────────────────────────────────────
+  # Verifies forge dev deploys stub Lambdas and creates dev SQS queues.
+
+  smoke-dev:
+    name: Smoke — forge dev tunnel
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/smoke/go.sum
+            examples/smoke/infra/go.sum
+
+      - name: Download forge binary
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-binary
+
+      - name: Download smoke handler
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-handler
+          path: examples/smoke/functions
+
+      - name: Make forge executable
+        run: chmod +x forge
+
+      - name: Cache Pulumi plugins
+        uses: actions/cache@v5
+        with:
+          path: ~/.pulumi/plugins
+          key: pulumi-plugins-aws-v7.30.0
+
+      # ── Nimbus ──────────────────────────────────────────────────────────────
+
+      - name: Start Nimbus
+        run: |
+          docker network create nimbus-net
+
+          docker run -d \
+            --name dynamodb-local \
+            --network nimbus-net \
+            amazon/dynamodb-local:latest \
+            -jar DynamoDBLocal.jar -inMemory -sharedDb
+
+          docker run -d \
+            --name nimbus \
+            --network nimbus-net \
+            -p 4566:4566 \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            -e NIMBUS_DYNAMODB_ENDPOINT=http://dynamodb-local:8000 \
+            ghcr.io/nimbus-local/nimbus:0.4.13
+
+          echo -n "Waiting for Nimbus..."
+          until curl -sf http://localhost:4566/_nimbus/health >/dev/null; do
+            echo -n "."
+            sleep 1
+          done
+          echo " ready"
+
+      # ── Seed ────────────────────────────────────────────────────────────────
 
       - name: Seed AppSecret for dev stage
         run: |
@@ -140,6 +253,14 @@ jobs:
             --value "smoke-default" \
             --type SecureString \
             --overwrite
+
+      # ── Dev tunnel ──────────────────────────────────────────────────────────
+      # Run `forge dev` against a separate stage (ci-dev) to verify:
+      #   - forge-stub is cross-compiled and deployed correctly
+      #   - shared SQS dev queues are created
+      #   - stub Lambda env vars contain FORGE_REQUEST_QUEUE_URL
+      # The tunnel sits idle (Nimbus doesn't invoke Lambda), so we kill it
+      # after the deployment completes.
 
       - name: Run forge dev (background deploy)
         working-directory: examples/smoke
@@ -159,11 +280,9 @@ jobs:
         if: always()
         run: .github/scripts/smoke-assert-dev.sh
 
-      - name: Stop forge dev and remove dev stack
+      - name: Stop forge dev
         if: always()
-        run: |
-          kill "$(cat /tmp/forge-dev.pid 2>/dev/null)" 2>/dev/null || true
-        working-directory: examples/smoke
+        run: kill "$(cat /tmp/forge-dev.pid 2>/dev/null)" 2>/dev/null || true
         continue-on-error: true
 
       - name: Remove dev smoke stack
