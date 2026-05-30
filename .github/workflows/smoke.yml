@@ -104,7 +104,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.pulumi/plugins
-          key: pulumi-plugins-aws-v7.30.0
+          key: pulumi-plugins-aws-v7.31.0
 
       # ── Nimbus ──────────────────────────────────────────────────────────────
       # Nimbus proxies DynamoDB requests to the official amazon/dynamodb-local
@@ -215,7 +215,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.pulumi/plugins
-          key: pulumi-plugins-aws-v7.30.0
+          key: pulumi-plugins-aws-v7.31.0
 
       # ── Nimbus ──────────────────────────────────────────────────────────────
 
