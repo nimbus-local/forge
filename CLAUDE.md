@@ -488,7 +488,7 @@ No known gaps affecting current constructs.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
-| `NewVpc` | ✗ EC2 mostly not emulated (only DescribeSubnets stub) | unit tests only — awaiting full Nimbus EC2 support |
+| `NewVpc` | ✓ `ec2` (full VPC CRUD — Nimbus PR #69) | smoke added |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
@@ -503,7 +503,7 @@ No known gaps affecting current constructs.
 ### Remaining roadmap items
 
 - ✅ `forge dev` tunnel — implementation complete; integration test against Nimbus in progress
-- ✅ `NewVpc` — implemented; unit tests pass; smoke blocked (Nimbus EC2 not supported)
+- ✅ `NewVpc` — implemented; unit tests pass; smoke added (requires Nimbus PR #69)
 - ✅ `NewEmail` — implemented; unit tests pass; smoke blocked (Nimbus SESv2 not supported)
 - ✅ `NewCognitoUserPool` — implemented; unit tests pass; smoke planned
 - ✅ `NewCognitoIdentityPool` — implemented; unit tests pass; smoke planned

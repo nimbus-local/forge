@@ -27,6 +27,13 @@ func main() {
 			Home: "aws",
 		},
 		Run: func(ctx *forge.RunContext) error {
+			// ── VPC (public + private subnets, no NAT) ─────────────────────────
+
+			vpc := constructs.NewVpc(ctx, "Vpc", &constructs.VpcArgs{
+				AvailabilityZones: 2,
+				NAT:               "none",
+			})
+
 			// ── KMS key (encrypts all storage + the handler function) ─────────
 
 			key := constructs.NewKMSKey(ctx, "SmokeKey", nil)
@@ -167,6 +174,7 @@ func main() {
 			ctx.Export("dbEndpoint", db.Endpoint())
 			ctx.Export("cacheHost", cache.PrimaryEndpoint())
 			ctx.Export("efsAccessPointArn", efsFS.AccessPointARN())
+			ctx.Export("vpcId", vpc.ID())
 			return nil
 		},
 	})
