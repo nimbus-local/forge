@@ -483,8 +483,8 @@ Local smoke tests run against [Nimbus](https://github.com/nimbus-local/nimbus) (
 Not all AWS services are emulated. Constructs blocked on Nimbus support are unit-tested only
 until the service is added.
 
-**Known Nimbus gaps (as of 2026-05-26):**
-- `elasticache:AddTagsToResource` — returns HTTP 200 but with malformed XML body (`AddTagsToResourceResult node not found`). Pulumi's AWS provider fails to parse the response when trying to sync tags on existing ElastiCache SubnetGroup and ParameterGroup resources. Workaround: do not pass `Tags` to ElastiCache SubnetGroup and ParameterGroup (only tag the ReplicationGroup). Track at nimbus-local/nimbus.
+**Known Nimbus gaps (as of 2026-05-30):**
+No known gaps affecting current constructs.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
@@ -492,7 +492,7 @@ until the service is added.
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
-| `NewCache` | ✓ `elasticache` (partial — `AddTagsToResource` unimplemented) | smoke added (SubnetGroup/ParameterGroup untagged as workaround) |
+| `NewCache` | ✓ `elasticache` | smoke added |
 | `NewEfs` | ✓ `efs` | smoke added |
 | `NewBus` | ✓ `eventbridge` | smoke planned |
 | `NewKinesisStream` | ✓ `kinesis` | smoke added |
