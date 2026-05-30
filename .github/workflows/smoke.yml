@@ -85,12 +85,12 @@ jobs:
             examples/smoke/infra/go.sum
 
       - name: Download forge binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: forge-binary
 
       - name: Download smoke handler
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: smoke-handler
           path: examples/smoke/functions
@@ -198,12 +198,12 @@ jobs:
             examples/smoke/infra/go.sum
 
       - name: Download forge binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: forge-binary
 
       - name: Download smoke handler
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: smoke-handler
           path: examples/smoke/functions
