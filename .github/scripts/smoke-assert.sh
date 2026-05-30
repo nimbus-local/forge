@@ -175,6 +175,14 @@ echo "── ElastiCache ReplicationGroup"
 check_match "replication group ${PREFIX}-cache exists" "${PREFIX}-cache" \
   $CLI elasticache describe-replication-groups
 
+echo "── ElastiCache tags (SubnetGroup + ParameterGroup)"
+SUBNET_GROUP_ARN="arn:aws:elasticache:${REGION}:${ACCOUNT_ID}:subnetgroup:${PREFIX}-cache-subnets"
+PARAM_GROUP_ARN="arn:aws:elasticache:${REGION}:${ACCOUNT_ID}:parametergroup:${PREFIX}-cache-params"
+check_match "subnet group ${PREFIX}-cache-subnets has forge:app tag" "forge:app" \
+  $CLI elasticache list-tags-for-resource --resource-name "$SUBNET_GROUP_ARN"
+check_match "param group ${PREFIX}-cache-params has forge:app tag" "forge:app" \
+  $CLI elasticache list-tags-for-resource --resource-name "$PARAM_GROUP_ARN"
+
 # ── ElastiCache link injection ────────────────────────────────────────────────
 
 echo ""
