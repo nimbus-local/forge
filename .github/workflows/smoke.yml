@@ -98,13 +98,38 @@ jobs:
       - name: Make forge executable
         run: chmod +x forge
 
+      # Pin the Pulumi CLI to the version forge bundles (PulumiVersion in
+      # forge.go), overriding whatever the runner image happens to ship. The
+      # gocloud.dev baked into Pulumi opens the s3:// state backend; pinning it
+      # keeps the backend URL params deterministic across runner-image rollouts.
+      - name: Pin Pulumi CLI to forge's bundled version
+        run: |
+          ver=$(grep -oP 'PulumiVersion = "\K[0-9.]+' forge.go)
+          echo "Installing Pulumi v$ver (from forge.go PulumiVersion)"
+          curl -fsSL https://get.pulumi.com | sh -s -- --version "$ver"
+          echo "$HOME/.pulumi/bin" >> "$GITHUB_PATH"
+
+      # Sync the example infra module to whatever forge's go.mod now pins. The
+      # infra module `replace`s forge => local, so a Dependabot bump to a shared
+      # dependency (pulumi-aws, pulumi/sdk, …) in the root go.mod leaves
+      # examples/smoke/infra/go.sum stale until tidied — otherwise `forge deploy`
+      # fails the build with a missing go.sum entry.
+      - name: Sync smoke infra module
+        working-directory: examples/smoke/infra
+        run: go mod tidy
+
       # Cache the Pulumi AWS provider plugin so the ~100 MB download only happens
-      # when the plugin version in forge.go changes.
+      # when the SDK version (and thus the plugin forge installs) changes. The
+      # key is derived from go.mod so it tracks bumps automatically.
+      - name: Resolve AWS plugin version
+        id: awsver
+        run: echo "v=$(go list -m -f '{{.Version}}' github.com/pulumi/pulumi-aws/sdk/v7)" >> "$GITHUB_OUTPUT"
+
       - name: Cache Pulumi plugins
         uses: actions/cache@v5
         with:
           path: ~/.pulumi/plugins
-          key: pulumi-plugins-aws-v7.31.0
+          key: pulumi-plugins-aws-${{ steps.awsver.outputs.v }}
 
       # ── Nimbus ──────────────────────────────────────────────────────────────
       # Nimbus proxies DynamoDB requests to the official amazon/dynamodb-local
@@ -211,11 +236,28 @@ jobs:
       - name: Make forge executable
         run: chmod +x forge
 
+      # See the smoke job for why this pin is required (deterministic gocloud.dev).
+      - name: Pin Pulumi CLI to forge's bundled version
+        run: |
+          ver=$(grep -oP 'PulumiVersion = "\K[0-9.]+' forge.go)
+          echo "Installing Pulumi v$ver (from forge.go PulumiVersion)"
+          curl -fsSL https://get.pulumi.com | sh -s -- --version "$ver"
+          echo "$HOME/.pulumi/bin" >> "$GITHUB_PATH"
+
+      # See the smoke job for why this tidy is required (replace => local forge).
+      - name: Sync smoke infra module
+        working-directory: examples/smoke/infra
+        run: go mod tidy
+
+      - name: Resolve AWS plugin version
+        id: awsver
+        run: echo "v=$(go list -m -f '{{.Version}}' github.com/pulumi/pulumi-aws/sdk/v7)" >> "$GITHUB_OUTPUT"
+
       - name: Cache Pulumi plugins
         uses: actions/cache@v5
         with:
           path: ~/.pulumi/plugins
-          key: pulumi-plugins-aws-v7.31.0
+          key: pulumi-plugins-aws-${{ steps.awsver.outputs.v }}
 
       # ── Nimbus ──────────────────────────────────────────────────────────────
 
