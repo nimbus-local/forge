@@ -446,17 +446,20 @@ func resolvePulumiCommand() (auto.PulumiCommand, error) {
 // parameters. The gocloud.dev S3 driver parses these directly, bypassing AWS SDK
 // environment variable reading (which varies across gocloud.dev versions).
 //
-// The parameter names are the AWS-SDK-v2 spellings (disable_https, use_path_style)
-// required by gocloud.dev >= v0.40, which dropped AWS SDK v1 along with the old
-// disableSSL / s3ForcePathStyle names. The Pulumi engine that opens this backend
-// (PulumiVersion) bundles a current gocloud.dev, so the v2 names are correct.
+// The parameter names must match the gocloud.dev baked into the Pulumi engine
+// that opens this backend. forge pins that engine to PulumiVersion, whose
+// gocloud.dev still uses the AWS-SDK-v1 spellings (disableSSL, s3ForcePathStyle).
+// A much newer Pulumi switched gocloud.dev to the v2 names (disable_https,
+// use_path_style) — so when PulumiVersion is bumped past that cutoff, these names
+// must be updated in the same change. The smoke CI pins the CLI to PulumiVersion
+// precisely so this stays deterministic.
 func stateBackendURL(appName, stage, accountID string) string {
 	bucket := os.Getenv("FORGE_STATE_BUCKET")
 	if bucket == "" {
 		bucket = fmt.Sprintf("%s-%s-forge-state-%s", appName, stage, accountID)
 	}
 	if endpoint := os.Getenv("FORGE_AWS_ENDPOINT"); endpoint != "" {
-		return fmt.Sprintf("s3://%s?endpoint=%s&disable_https=true&use_path_style=true",
+		return fmt.Sprintf("s3://%s?endpoint=%s&disableSSL=true&s3ForcePathStyle=true",
 			bucket, url.QueryEscape(endpoint))
 	}
 	return "s3://" + bucket
