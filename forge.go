@@ -449,10 +449,15 @@ func resolvePulumiCommand() (auto.PulumiCommand, error) {
 // The parameter names must match the gocloud.dev baked into the Pulumi engine
 // that opens this backend. forge pins that engine to PulumiVersion, whose
 // gocloud.dev still uses the AWS-SDK-v1 spellings (disableSSL, s3ForcePathStyle).
-// A much newer Pulumi switched gocloud.dev to the v2 names (disable_https,
-// use_path_style) — so when PulumiVersion is bumped past that cutoff, these names
-// must be updated in the same change. The smoke CI pins the CLI to PulumiVersion
-// precisely so this stays deterministic.
+//
+// CUTOFF: Pulumi v3.245.0 updated its DIY backend to gocloud.dev 0.46 / AWS SDK
+// v2 (pulumi/pulumi#23421), which drops disableSSL/s3ForcePathStyle and requires
+// the v2 spellings disable_https/use_path_style instead. So the day PulumiVersion
+// is bumped to >= 3.245.0, these two param names MUST be flipped to
+// disable_https/use_path_style in the same change — otherwise every
+// FORGE_AWS_ENDPOINT (Nimbus/localstack) deploy fails with
+// `unknown query parameter "disableSSL"`. The smoke CI pins the CLI to
+// PulumiVersion precisely so this stays deterministic.
 func stateBackendURL(appName, stage, accountID string) string {
 	bucket := os.Getenv("FORGE_STATE_BUCKET")
 	if bucket == "" {
