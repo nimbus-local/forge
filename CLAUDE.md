@@ -535,7 +535,7 @@ github.com/aws/aws-sdk-go-v2/service/sqs v1.42.27
 github.com/aws/aws-sdk-go-v2/service/ssm v1.68.6
 github.com/aws/aws-sdk-go-v2/service/sts v1.42.1
 github.com/charmbracelet/lipgloss v1.1.0
-github.com/pulumi/pulumi-aws/sdk/v7 v7.30.0   ← NOTE: v7, not v6
+github.com/pulumi/pulumi-aws/sdk/v7 v7.31.0   ← NOTE: v7, not v6
 github.com/pulumi/pulumi-cloudflare/sdk/v5 v5.49.1
 github.com/pulumi/pulumi/sdk/v3 v3.243.0
 github.com/spf13/cobra v1.10.2

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -325,10 +326,14 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		return fmt.Errorf("stack init: %w", err)
 	}
 
-	// Install cloud provider plugins based on Home.
+	// Install cloud provider plugins based on Home. The plugin version is read
+	// from the running program's build info so it always tracks the SDK version
+	// pinned in go.mod — see pluginVersion(). Hand-edited version strings here
+	// drift out of sync every time Dependabot bumps the SDK.
 	home := cfg.App.Home
 	if home == "" || home == "aws" || home == "aws+cloudflare" {
-		if err := stack.Workspace().InstallPlugin(ctx, "aws", "v7.30.0"); err != nil {
+		v := pluginVersion("github.com/pulumi/pulumi-aws/sdk/v7", "v7.31.0")
+		if err := stack.Workspace().InstallPlugin(ctx, "aws", v); err != nil {
 			return fmt.Errorf("install aws plugin: %w", err)
 		}
 	}
@@ -336,7 +341,8 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 		if err := validateCFCredentials(); err != nil {
 			return err
 		}
-		if err := stack.Workspace().InstallPlugin(ctx, "cloudflare", "v5.49.1"); err != nil {
+		v := pluginVersion("github.com/pulumi/pulumi-cloudflare/sdk/v5", "v5.49.1")
+		if err := stack.Workspace().InstallPlugin(ctx, "cloudflare", v); err != nil {
 			return fmt.Errorf("install cloudflare plugin: %w", err)
 		}
 	}
@@ -391,6 +397,32 @@ func runPulumi(cfg *Config, stage string, stageCfg *StageConfig, action string) 
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// pluginVersion returns the provider plugin version to install for the given
+// SDK module, read from the running program's build info. The Pulumi provider
+// plugin must match the SDK version compiled into the inline program, so we
+// resolve it from the same go.mod that built the binary rather than hardcoding
+// a literal that drifts every time the SDK is bumped. fallback is used when the
+// module is absent from build info (e.g. a test binary that does not link it).
+func pluginVersion(modulePath, fallback string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return fallback
+	}
+	for _, dep := range info.Deps {
+		if dep.Path != modulePath {
+			continue
+		}
+		v := dep.Version
+		if dep.Replace != nil && dep.Replace.Version != "" {
+			v = dep.Replace.Version
+		}
+		if v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return fallback
+}
 
 // resolvePulumiCommand returns a PulumiCommand using the system-installed
 // Pulumi binary if available, or auto-downloads it to ~/.forge/pulumi/<version>/.
