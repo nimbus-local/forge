@@ -489,14 +489,38 @@ Not all AWS services are emulated. Constructs blocked on Nimbus support are unit
 until the service is added.
 
 **Known Nimbus gaps (as of 2026-06-19):**
-- No known gaps. SQS `GetQueueAttributes` waiter fix was added in Nimbus v0.4.20 (issue #86), unblocking `forge remove` when SQS queues are destroyed.
+- No known gaps. EC2 `DescribeNetworkInterfaces` added in v0.4.17 (PR #80). SQS `GetQueueAttributes` waiter fix added in v0.4.20 (issue #86).
+
+#### SQS teardown is slow — 129s per queue — this is permanent and unfixable from forge or Nimbus
+
+Every `aws:sqs:Queue` resource takes **exactly 129 seconds to delete** during `forge remove`. With
+two queues (main + DLQ), teardown adds ~258s. This is expected — do not investigate it as a bug.
+
+**Root cause:** The Terraform AWS provider's `waitQueueDeleted` (compiled into the Pulumi binary)
+polls `GetQueueAttributes` with `ContinuousTargetOccurence: 15` — it must see 15 consecutive
+"queue not found" responses before declaring success. With `MinTimeout: 3s` and the
+terraform-plugin-sdk's polling backoff, those 15 polls accumulate to exactly 129s.
+
+Nimbus already returns the not-found error on the very first `GetQueueAttributes` poll after
+`DeleteQueue` — the queue is gone immediately. But the waiter still counts to 15. There is no
+response Nimbus can return that bypasses the `ContinuousTargetOccurence` counter; that logic
+is inside the compiled Pulumi binary. The only fix would be patching `ContinuousTargetOccurence`
+in the upstream Terraform AWS provider and rebuilding Pulumi, which is not feasible.
+
+**History that burned time — do not re-open:**
+
+- **v0.4.17**: teardown worked, took 129s per queue.
+- **v0.4.18/v0.4.19** (Nimbus PR #85): `writeError` remapped `AWS.SimpleQueueService.NonExistentQueue` → `QueueDoesNotExist` globally to fix a creation waiter. Side effect: `GetQueueAttributes` now returned a typed `*types.QueueDoesNotExist` error. The Terraform provider checks `tfawserr.ErrCodeEquals(err, "AWS.SimpleQueueService.NonExistentQueue")`, which compares against `ErrorCode()` = `"QueueDoesNotExist"` — mismatch → teardown failed immediately with a non-retriable error.
+- **v0.4.20** (Nimbus issue #86): scoped the remap to `getQueueURL` only; `getQueueAttributes` kept returning the old code. Teardown works again at 129s — identical to v0.4.17. The upgrade from v0.4.17 → v0.4.20 provided no observable improvement to teardown speed; it only fixed the outright failure introduced in v0.4.18/v0.4.19.
+
+The 129s is what real AWS `waitQueueDeleted` also does (AWS queues remain accessible ~60s after
+deletion; the waiter's conservatism exists for a reason). Accept it, don't chase it.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
 | `NewVpc` | ✓ `ec2` (VPC CRUD + teardown — Nimbus v0.4.17) | smoke added |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
-| `NewDatabase` | ✓ `rds` | planned |
 | `NewCache` | ✓ `elasticache` | smoke added |
 | `NewEfs` | ✓ `efs` | smoke added |
 | `NewBus` | ✓ `eventbridge` | smoke planned |
