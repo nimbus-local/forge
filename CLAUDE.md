@@ -489,7 +489,7 @@ Not all AWS services are emulated. Constructs blocked on Nimbus support are unit
 until the service is added.
 
 **Known Nimbus gaps (as of 2026-06-19):**
-- No known gaps. EC2 `DescribeNetworkInterfaces` was added in Nimbus v0.4.17 (PR #80), unblocking VPC/subnet teardown.
+- No known gaps. SQS `GetQueueAttributes` waiter fix was added in Nimbus v0.4.20 (issue #86), unblocking `forge remove` when SQS queues are destroyed.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|

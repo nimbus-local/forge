@@ -10,7 +10,7 @@
 
 services:
   nimbus:
-    image: ghcr.io/nimbus-local/nimbus:0.4.17
+    image: ghcr.io/nimbus-local/nimbus:0.4.20
     container_name: forge-smoke-nimbus
     ports:
       - "4567:4566"
