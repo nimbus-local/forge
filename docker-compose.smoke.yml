@@ -13,7 +13,7 @@ services:
     image: ghcr.io/nimbus-local/nimbus:0.4.17
     container_name: forge-smoke-nimbus
     ports:
-      - "4566:4566"
+      - "4567:4566"
     environment:
       AWS_DEFAULT_REGION: us-east-1
       NIMBUS_DYNAMODB_ENDPOINT: http://forge-smoke-dynamodb:8000

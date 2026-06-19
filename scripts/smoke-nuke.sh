@@ -9,12 +9,12 @@
 #   PREFIX defaults to "forge-smoke". Pass a different prefix to target
 #   another app (e.g. "my-app-dev").
 #
-# Requires Nimbus running at AWS_ENDPOINT_URL (default http://localhost:4566).
+# Requires Nimbus running at AWS_ENDPOINT_URL (default http://localhost:4567).
 # Standard AWS env vars (AWS_ACCESS_KEY_ID etc.) must be set for Nimbus auth.
 
 set -euo pipefail
 
-ENDPOINT="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+ENDPOINT="${AWS_ENDPOINT_URL:-http://localhost:4567}"
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 PREFIX="${1:-forge-smoke}"
 
