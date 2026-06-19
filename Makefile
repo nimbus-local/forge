@@ -25,8 +25,8 @@ SMOKE_ENV := \
 	AWS_ACCESS_KEY_ID=test \
 	AWS_SECRET_ACCESS_KEY=test \
 	AWS_DEFAULT_REGION=us-east-1 \
-	AWS_ENDPOINT_URL=http://localhost:4566 \
-	FORGE_AWS_ENDPOINT=http://localhost:4566 \
+	AWS_ENDPOINT_URL=http://localhost:4567 \
+	FORGE_AWS_ENDPOINT=http://localhost:4567 \
 	PULUMI_CONFIG_PASSPHRASE=""
 
 smoke-up:
@@ -57,7 +57,7 @@ smoke: build smoke-up
 		--value "smoke-default" \
 		--type SecureString \
 		--overwrite \
-		--endpoint-url http://localhost:4566 --region us-east-1 --no-cli-pager
+		--endpoint-url http://localhost:4567 --region us-east-1 --no-cli-pager
 
 	@echo "=== Deploying smoke stack ==="
 	cd examples/smoke && $(SMOKE_ENV) /tmp/forge-local deploy --stage ci
