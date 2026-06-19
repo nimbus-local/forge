@@ -483,16 +483,12 @@ Local smoke tests run against [Nimbus](https://github.com/nimbus-local/nimbus) (
 Not all AWS services are emulated. Constructs blocked on Nimbus support are unit-tested only
 until the service is added.
 
-**Known Nimbus gaps (as of 2026-06-10):**
-- EC2 `DescribeNetworkInterfaces` is not emulated (returns 501). The AWS provider
-  calls it when **deleting** a subnet (to detach ENIs first), so VPC stacks can be
-  created and asserted but not torn down. `forge remove` in the smoke jobs fails at
-  teardown — absorbed by `continue-on-error`, but it emits error annotations.
-  Tracked in nimbus-local/nimbus#79.
+**Known Nimbus gaps (as of 2026-06-19):**
+- No known gaps. EC2 `DescribeNetworkInterfaces` was added in Nimbus v0.4.17 (PR #80), unblocking VPC/subnet teardown.
 
 | Construct | Nimbus support | Smoke status |
 |---|---|---|
-| `NewVpc` | ✓ `ec2` (VPC CRUD — Nimbus PR #69; teardown blocked by missing `DescribeNetworkInterfaces`, Nimbus #79) | smoke added (teardown best-effort) |
+| `NewVpc` | ✓ `ec2` (VPC CRUD + teardown — Nimbus v0.4.17) | smoke added |
 | `NewEmail` | ✗ SESv2 not emulated (SES v1 only) | unit tests only — awaiting Nimbus SESv2 support |
 | `NewCognitoUserPool` / `NewCognitoIdentityPool` | ✓ `cognito` | planned |
 | `NewDatabase` | ✓ `rds` | planned |
