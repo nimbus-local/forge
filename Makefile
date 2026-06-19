@@ -1,4 +1,4 @@
-.PHONY: setup test build build-stub smoke smoke-clean smoke-nuke
+.PHONY: setup test build build-stub smoke smoke-up smoke-down smoke-clean smoke-nuke
 
 # Wire up the committed git hooks. Run once after cloning.
 setup:
@@ -17,8 +17,9 @@ test:
 	go test ./... -short
 
 # ── Local smoke test against Nimbus ──────────────────────────────────────────
-# Requires Nimbus running at localhost:4566 (cd ~/source/nimbus-local/nimbus && docker compose up -d).
+# Fully standalone — `make smoke` starts Nimbus automatically via smoke-up.
 # Mirrors the steps in .github/workflows/smoke.yml.
+# When bumping Nimbus, update NIMBUS_VERSION in docker-compose.smoke.yml AND smoke.yml.
 
 SMOKE_ENV := \
 	AWS_ACCESS_KEY_ID=test \
@@ -28,7 +29,15 @@ SMOKE_ENV := \
 	FORGE_AWS_ENDPOINT=http://localhost:4566 \
 	PULUMI_CONFIG_PASSPHRASE=""
 
-smoke: build
+smoke-up:
+	@echo "=== Starting Nimbus ==="
+	docker compose -f docker-compose.smoke.yml up -d --wait
+
+smoke-down:
+	@echo "=== Stopping Nimbus ==="
+	docker compose -f docker-compose.smoke.yml down
+
+smoke: build smoke-up
 	@echo "=== Building forge CLI ==="
 	go build -o /tmp/forge-local ./cmd/forge
 
@@ -38,6 +47,9 @@ smoke: build
 		go build -o bootstrap ./functions/handler && \
 		zip -j functions/handler.zip bootstrap && \
 		rm bootstrap
+
+	@echo "=== Syncing smoke infra module ==="
+	cd examples/smoke/infra && go mod tidy
 
 	@echo "=== Seeding AppSecret in SSM ==="
 	$(SMOKE_ENV) aws ssm put-parameter \
