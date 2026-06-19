@@ -480,6 +480,11 @@ infrastructure for a magic link auth system. No additional construct needed.
 ### Smoke test infrastructure notes
 
 Local smoke tests run against [Nimbus](https://github.com/nimbus-local/nimbus) (`make smoke`).
+`docker-compose.smoke.yml` in the repo root starts Nimbus + DynamoDB Local automatically —
+no external Nimbus installation needed. `make smoke` calls `make smoke-up` as a prerequisite;
+`make smoke-down` stops the containers. When bumping the Nimbus version, update the image tag
+in **both** `docker-compose.smoke.yml` and `.github/workflows/smoke.yml`.
+
 Not all AWS services are emulated. Constructs blocked on Nimbus support are unit-tested only
 until the service is added.
 
@@ -537,7 +542,7 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.42.1
 github.com/charmbracelet/lipgloss v1.1.0
 github.com/pulumi/pulumi-aws/sdk/v7 v7.31.0   ← NOTE: v7, not v6
 github.com/pulumi/pulumi-cloudflare/sdk/v5 v5.49.1
-github.com/pulumi/pulumi/sdk/v3 v3.243.0
+github.com/pulumi/pulumi/sdk/v3 v3.247.0
 github.com/spf13/cobra v1.10.2
 ```
 
@@ -601,6 +606,7 @@ All new constructs must import `github.com/pulumi/pulumi-aws/sdk/v7/go/aws/...`.
 | `FORGE_STATE_BUCKET` | user (optional) | forge.go | Override S3 state bucket |
 | `FORGE_FORCE_REMOVE` | CLI --force flag | forge.Run() | Bypass protected stage check |
 | `FORGE_AWS_ENDPOINT` | user (optional) | all AWS SDK clients, Pulumi provider | Redirect all AWS API calls to a local emulator (e.g. Nimbus at `http://localhost:4566`) |
+| `FORGE_USE_SYSTEM_PULUMI` | user (optional) | forge.go | Set to `1` to use whatever `pulumi` is on PATH instead of the bundled PulumiVersion |
 | `PULUMI_CONFIG_PASSPHRASE` | user | Pulumi auto | State file encryption |
 | `AWS_PROFILE` | StageConfig / user | AWS SDK | Credential profile |
 | `AWS_DEFAULT_REGION` | StageConfig / user | AWS SDK | Target region |

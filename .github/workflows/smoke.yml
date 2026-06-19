@@ -98,17 +98,6 @@ jobs:
       - name: Make forge executable
         run: chmod +x forge
 
-      # Pin the Pulumi CLI to the version forge bundles (PulumiVersion in
-      # forge.go), overriding whatever the runner image happens to ship. The
-      # gocloud.dev baked into Pulumi opens the s3:// state backend; pinning it
-      # keeps the backend URL params deterministic across runner-image rollouts.
-      - name: Pin Pulumi CLI to forge's bundled version
-        run: |
-          ver=$(grep -oP 'PulumiVersion = "\K[0-9.]+' forge.go)
-          echo "Installing Pulumi v$ver (from forge.go PulumiVersion)"
-          curl -fsSL https://get.pulumi.com | sh -s -- --version "$ver"
-          echo "$HOME/.pulumi/bin" >> "$GITHUB_PATH"
-
       # Sync the example infra module to whatever forge's go.mod now pins. The
       # infra module `replace`s forge => local, so a Dependabot bump to a shared
       # dependency (pulumi-aws, pulumi/sdk, …) in the root go.mod leaves
@@ -235,14 +224,6 @@ jobs:
 
       - name: Make forge executable
         run: chmod +x forge
-
-      # See the smoke job for why this pin is required (deterministic gocloud.dev).
-      - name: Pin Pulumi CLI to forge's bundled version
-        run: |
-          ver=$(grep -oP 'PulumiVersion = "\K[0-9.]+' forge.go)
-          echo "Installing Pulumi v$ver (from forge.go PulumiVersion)"
-          curl -fsSL https://get.pulumi.com | sh -s -- --version "$ver"
-          echo "$HOME/.pulumi/bin" >> "$GITHUB_PATH"
 
       # See the smoke job for why this tidy is required (replace => local forge).
       - name: Sync smoke infra module

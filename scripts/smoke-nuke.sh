@@ -23,7 +23,7 @@ AWS="aws --endpoint-url $ENDPOINT --region $REGION --no-cli-pager"
 # Verify Nimbus is reachable before doing anything.
 if ! curl -sf "${ENDPOINT}/_nimbus/health" >/dev/null 2>&1; then
     echo "error: Nimbus is not running at ${ENDPOINT}" >&2
-    echo "       Start it with: cd ~/source/nimbus-local/nimbus && docker compose up -d" >&2
+    echo "       Start it with: make smoke-up" >&2
     exit 1
 fi
 
@@ -117,6 +117,31 @@ functions=$($AWS --output text lambda list-functions \
 
 for fn in $functions; do
     nuke "$fn" $AWS lambda delete-function --function-name "$fn"
+done
+
+# ── Step Functions state machines ────────────────────────────────────────────
+
+echo ""
+echo "── Step Functions state machines"
+
+sfn_arns=$($AWS --output text stepfunctions list-state-machines \
+    --query "stateMachines[?starts_with(name, \`${PREFIX}-\`)].stateMachineArn" 2>/dev/null || true)
+
+for arn in $sfn_arns; do
+    name="${arn##*:}"
+    nuke "$name" $AWS stepfunctions delete-state-machine --state-machine-arn "$arn"
+done
+
+# ── Kinesis streams ───────────────────────────────────────────────────────────
+
+echo ""
+echo "── Kinesis streams"
+
+streams=$($AWS --output text kinesis list-streams \
+    --query "StreamNames[?starts_with(@, \`${PREFIX}-\`)]" 2>/dev/null || true)
+
+for stream in $streams; do
+    nuke "$stream" $AWS kinesis delete-stream --stream-name "$stream"
 done
 
 # ── EventBridge Scheduler schedules ──────────────────────────────────────────
