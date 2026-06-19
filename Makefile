@@ -20,6 +20,11 @@ test:
 # Fully standalone — `make smoke` starts Nimbus automatically via smoke-up.
 # Mirrors the steps in .github/workflows/smoke.yml.
 # When bumping Nimbus, update NIMBUS_VERSION in docker-compose.smoke.yml AND smoke.yml.
+#
+# SQS teardown note: GHA pre-deletes SQS queues before `forge remove` to skip
+# Pulumi's ~130 s polling wait per queue (AWS enforces a deletion delay). Locally,
+# run `make smoke-clean` after `make smoke` to exercise the full Pulumi teardown
+# path — including SQS deletion — which is the only place that coverage lives.
 
 SMOKE_ENV := \
 	AWS_ACCESS_KEY_ID=test \

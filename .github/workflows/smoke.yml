@@ -176,6 +176,19 @@ jobs:
 
       # ── Cleanup ─────────────────────────────────────────────────────────────
 
+      # Pre-delete SQS queues before `forge remove` to skip Pulumi's ~130 s
+      # polling wait per queue (AWS enforces a deletion delay that Nimbus faithfully
+      # emulates). Pulumi treats a 404 on delete as success, so the stack still
+      # reaches zero resources. Full SQS teardown via Pulumi is exercised locally
+      # via `make smoke-clean` — that is where that coverage lives.
+      - name: Pre-delete SQS queues
+        if: always()
+        continue-on-error: true
+        run: |
+          aws sqs list-queues --query 'QueueUrls[]' --output text 2>/dev/null \
+            | tr '\t' '\n' \
+            | xargs -r -I{} aws sqs delete-queue --queue-url {}
+
       - name: Remove smoke stack
         if: always()
         working-directory: examples/smoke
@@ -307,6 +320,16 @@ jobs:
         if: always()
         run: kill "$(cat /tmp/forge-dev.pid 2>/dev/null)" 2>/dev/null || true
         continue-on-error: true
+
+      # Pre-delete SQS queues (dev tunnel req/res queues) for the same reason as
+      # the smoke job — skips Pulumi's ~130 s polling wait per queue on GHA.
+      - name: Pre-delete SQS queues
+        if: always()
+        continue-on-error: true
+        run: |
+          aws sqs list-queues --query 'QueueUrls[]' --output text 2>/dev/null \
+            | tr '\t' '\n' \
+            | xargs -r -I{} aws sqs delete-queue --queue-url {}
 
       - name: Remove dev smoke stack
         if: always()
