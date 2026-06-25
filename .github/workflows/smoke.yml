@@ -115,7 +115,7 @@ jobs:
         run: echo "v=$(go list -m -f '{{.Version}}' github.com/pulumi/pulumi-aws/sdk/v7)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Pulumi plugins
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.pulumi/plugins
           key: pulumi-plugins-aws-${{ steps.awsver.outputs.v }}
@@ -235,7 +235,7 @@ jobs:
         run: echo "v=$(go list -m -f '{{.Version}}' github.com/pulumi/pulumi-aws/sdk/v7)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Pulumi plugins
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.pulumi/plugins
           key: pulumi-plugins-aws-${{ steps.awsver.outputs.v }}
