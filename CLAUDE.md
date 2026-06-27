@@ -528,6 +528,7 @@ deletion; the waiter's conservatism exists for a reason). Accept it, don't chase
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
 | `NewStepFunctions` | ✓ `sfn` | smoke added |
 | `NewDatabase` | ✓ `rds` | smoke added |
+| `NewAppSync` | ✓ `appsync` (Nimbus v0.4.21) — management API only; GraphQL HTTP execution not yet emulated | smoke added |
 
 ### Remaining roadmap items
 
@@ -541,9 +542,9 @@ deletion; the waiter's conservatism exists for a reason). Accept it, don't chase
 - ✅ `NewApiGatewayWebSocket` — implemented; unit tests pass; smoke blocked (Nimbus WebSocket protocol not supported)
 - ✅ `NewStepFunctions` — implemented; unit tests pass; smoke added
 - ✅ `NewDatabase` (Aurora Serverless v2) — implemented; unit tests pass; smoke added
-- ✅ `NewCache` (ElastiCache ReplicationGroup, Redis/Valkey) — implemented; unit tests pass; smoke planned
+- ✅ `NewCache` (ElastiCache ReplicationGroup, Redis/Valkey) — implemented; unit tests pass; smoke added
 - ✅ `NewEfs` — implemented; unit tests pass; smoke added
-- `NewAppSync` — planned
+- ✅ `NewAppSync` — implemented; unit tests pass; smoke added (Nimbus v0.4.21)
 - `NewOpenSearch` — planned
 - `NewApiGatewayV1` — planned
 - `NewRealtime` (IoT) — planned

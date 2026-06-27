@@ -146,6 +146,26 @@ func main() {
 				Job:      handlerArgs,
 			})
 
+			// ── AppSync GraphQL API ───────────────────────────────────────────
+
+			gql := constructs.NewAppSync(ctx, "Graph", &constructs.AppSyncArgs{
+				Schema: `
+schema { query: Query mutation: Mutation }
+type Query    { echo(msg: String!): String }
+type Mutation { createRecord(id: String!): String }
+`,
+				ApiKeyExpiry: "2027-01-01T00:00:00Z",
+				DataSources: []constructs.AppSyncDataSource{
+					{Name: "LambdaDS", Type: constructs.AppSyncDataSourceLambda, Function: fn},
+				},
+				Resolvers: []constructs.AppSyncResolver{
+					{TypeName: "Query", FieldName: "echo", DataSource: "LambdaDS"},
+					{TypeName: "Mutation", FieldName: "createRecord", DataSource: "LambdaDS"},
+				},
+			})
+			ctx.Export("appsyncUrl", gql.URL())
+			ctx.Export("appsyncApiId", gql.APIID())
+
 			// ── Service (ECS Fargate) ─────────────────────────────────────────
 			// Uncomment and fill in your VPC details to exercise NewService.
 			// Requires an existing VPC with at least one subnet.
