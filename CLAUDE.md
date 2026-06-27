@@ -528,7 +528,7 @@ deletion; the waiter's conservatism exists for a reason). Accept it, don't chase
 | `NewApiGatewayWebSocket` | ✗ WebSocket protocol not emulated | unit tests only — awaiting Nimbus WebSocket support |
 | `NewStepFunctions` | ✓ `sfn` | smoke added |
 | `NewDatabase` | ✓ `rds` | smoke added |
-| `NewAppSync` | ✓ `appsync` (Nimbus v0.4.21) | smoke added |
+| `NewAppSync` | ✓ `appsync` (Nimbus v0.4.21) — management API only; GraphQL HTTP execution not yet emulated | smoke added |
 
 ### Remaining roadmap items
 

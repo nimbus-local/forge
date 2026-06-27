@@ -332,6 +332,15 @@ func (as *AppSync) APIID() pulumi.StringOutput {
 	return as.api.ID().ToStringOutput()
 }
 
+// APIKey returns the API key value as a Pulumi output.
+// Returns an empty string output when Auth is not AppSyncAuthAPIKey.
+func (as *AppSync) APIKey() pulumi.StringOutput {
+	if as.apiKey == nil {
+		return pulumi.String("").ToStringOutput()
+	}
+	return as.apiKey.Key
+}
+
 // GraphQLApi returns the underlying GraphQL API resource.
 func (as *AppSync) GraphQLApi() *appsync.GraphQLApi { return as.api }
 
