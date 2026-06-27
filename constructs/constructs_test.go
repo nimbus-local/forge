@@ -288,6 +288,34 @@ func (m *testMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.
 		)
 		outputs["name"] = resource.NewStringProperty(name)
 		outputs["status"] = resource.NewStringProperty("ACTIVE")
+
+	// ── AppSync resources ─────────────────────────────────────────────────────
+	case "aws:appsync/graphQLApi:GraphQLApi":
+		apiID := args.Name + "-api-id"
+		outputs["id"] = resource.NewStringProperty(apiID)
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:appsync:us-east-1:123456789012:apis/" + apiID,
+		)
+		outputs["uris"] = resource.NewObjectProperty(resource.PropertyMap{
+			"GRAPHQL": resource.NewStringProperty(
+				"https://" + apiID + ".appsync-api.us-east-1.amazonaws.com/graphql",
+			),
+		})
+	case "aws:appsync/apiKey:ApiKey":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["key"] = resource.NewStringProperty("da2-mock-api-key-" + args.Name)
+	case "aws:appsync/dataSource:DataSource":
+		dsName := str("name")
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["name"] = resource.NewStringProperty(dsName)
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:appsync:us-east-1:123456789012:apis/mock-api-id/datasources/" + dsName,
+		)
+	case "aws:appsync/resolver:Resolver":
+		outputs["id"] = resource.NewStringProperty(args.Name + "-id")
+		outputs["arn"] = resource.NewStringProperty(
+			"arn:aws:appsync:us-east-1:123456789012:apis/mock-api-id/types/Query/resolvers/" + args.Name,
+		)
 	}
 
 	m.mu.Lock()

@@ -220,6 +220,28 @@ echo "── EventBridge Scheduler"
 check_match "schedule ${PREFIX}-Heartbeat exists" "${PREFIX}-Heartbeat" \
   $CLI scheduler list-schedules
 
+# ── AppSync ───────────────────────────────────────────────────────────────────
+
+echo ""
+echo "── AppSync GraphQL API"
+APPSYNC_ID=$($CLI appsync list-graphql-apis \
+  --query "graphqlApis[?name=='${PREFIX}-Graph'].apiId | [0]" \
+  --output text 2>/dev/null || echo "")
+if [ -n "$APPSYNC_ID" ] && [ "$APPSYNC_ID" != "None" ]; then
+  ok "AppSync API ${PREFIX}-Graph found (id=${APPSYNC_ID})"
+  check_match "data source LambdaDS exists" "LambdaDS" \
+    $CLI appsync list-data-sources --api-id "$APPSYNC_ID"
+  check_match "resolver Query.echo exists" "echo" \
+    $CLI appsync list-resolvers --api-id "$APPSYNC_ID" --type-name "Query"
+  check_match "resolver Mutation.createRecord exists" "createRecord" \
+    $CLI appsync list-resolvers --api-id "$APPSYNC_ID" --type-name "Mutation"
+  check_match "API key created" "da2-" \
+    $CLI appsync list-api-keys --api-id "$APPSYNC_ID"
+else
+  fail "AppSync API ${PREFIX}-Graph not found" \
+    "check: $CLI appsync list-graphql-apis"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 echo ""
