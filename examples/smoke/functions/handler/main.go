@@ -52,6 +52,19 @@ func dispatch(ctx context.Context, raw json.RawMessage) (interface{}, error) {
 		}
 	}
 
+	// AppSync Lambda data sources receive the full VTL request template result:
+	// {"version":"2017-02-28","operation":"Invoke","payload":{...args...}}
+	// The smoke schema's echo(msg: String!) resolver uses the default template,
+	// so payload = {"msg": "<value>"}.
+	var appsyncInvoke struct {
+		Payload struct {
+			Msg string `json:"msg"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &appsyncInvoke); err == nil && appsyncInvoke.Payload.Msg != "" {
+		return appsyncInvoke.Payload.Msg, nil
+	}
+
 	// Unknown — log and succeed.
 	fmt.Printf("smoke: unknown event: %s\n", raw)
 	return nil, nil

@@ -231,12 +231,43 @@ if [ -n "$APPSYNC_ID" ] && [ "$APPSYNC_ID" != "None" ]; then
   ok "AppSync API ${PREFIX}-Graph found (id=${APPSYNC_ID})"
   check_match "data source LambdaDS exists" "LambdaDS" \
     $CLI appsync list-data-sources --api-id "$APPSYNC_ID"
+  check_match "data source LocalDS (NONE) exists" "LocalDS" \
+    $CLI appsync list-data-sources --api-id "$APPSYNC_ID"
   check_match "resolver Query.echo exists" "echo" \
+    $CLI appsync list-resolvers --api-id "$APPSYNC_ID" --type-name "Query"
+  check_match "resolver Query.ping exists" "ping" \
     $CLI appsync list-resolvers --api-id "$APPSYNC_ID" --type-name "Query"
   check_match "resolver Mutation.createRecord exists" "createRecord" \
     $CLI appsync list-resolvers --api-id "$APPSYNC_ID" --type-name "Mutation"
   check_match "API key created" "da2-" \
     $CLI appsync list-api-keys --api-id "$APPSYNC_ID"
+
+  # ── GraphQL HTTP execution (Nimbus v0.4.22+) ─────────────────────────────
+  APPSYNC_KEY=$($CLI appsync list-api-keys --api-id "$APPSYNC_ID" \
+    --query "apiKeys[0].id" --output text 2>/dev/null || echo "")
+
+  GQL_PING=$(curl -sf -X POST "${ENDPOINT}/_appsync/${APPSYNC_ID}/graphql" \
+    -H "x-api-key: ${APPSYNC_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"query":"query { ping }"}' 2>&1 || echo "")
+  if echo "$GQL_PING" | grep -q '"pong"'; then
+    ok "graphql execution (ping query, NONE resolver → \"pong\")"
+  else
+    fail "graphql execution (ping query, NONE resolver)" "response: $(echo "$GQL_PING" | head -1)"
+  fi
+
+  # Nimbus stubs Lambda invocations (doesn't execute the binary), so the echo
+  # field returns null. Verify the execution pipeline ran: "data" key present,
+  # no "errors" key. That proves VTL evaluation + Lambda call + response VTL.
+  GQL_ECHO=$(curl -sf -X POST "${ENDPOINT}/_appsync/${APPSYNC_ID}/graphql" \
+    -H "x-api-key: ${APPSYNC_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"query":"query { echo(msg: \"smoke\") }"}' 2>&1 || echo "")
+  if echo "$GQL_ECHO" | grep -q '"data"' && ! echo "$GQL_ECHO" | grep -q '"errors"'; then
+    ok "graphql execution (echo query, Lambda resolver pipeline)"
+  else
+    fail "graphql execution (echo query, Lambda resolver pipeline)" "response: $(echo "$GQL_ECHO" | head -1)"
+  fi
 else
   fail "AppSync API ${PREFIX}-Graph not found" \
     "check: $CLI appsync list-graphql-apis"

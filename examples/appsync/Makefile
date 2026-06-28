@@ -1,8 +1,8 @@
-.PHONY: nimbus-up nimbus-down build deploy-nimbus deploy query remove-nimbus remove
+.PHONY: nimbus-up nimbus-down build deploy-nimbus deploy query query-nimbus remove-nimbus remove
 
 STAGE        ?= dev
 NIMBUS_PORT  ?= 4567
-NIMBUS_IMAGE := ghcr.io/nimbus-local/nimbus:0.4.21
+NIMBUS_IMAGE := ghcr.io/nimbus-local/nimbus:0.4.22
 
 APP    := appsync-notes
 PREFIX := $(APP)-$(STAGE)
@@ -20,10 +20,6 @@ NIMBUS_CLI := $(NIMBUS_ENV) aws \
 	--region us-east-1 --no-cli-pager --output json
 
 # ── Nimbus ────────────────────────────────────────────────────────────────────
-# Nimbus v0.4.21 supports the AppSync management API (creating APIs, data
-# sources, resolvers, API keys) but does not yet emulate the AppSync GraphQL
-# HTTP execution endpoint. deploy-nimbus and remove-nimbus work; query requires
-# real AWS (or a future Nimbus version with HTTP execution support).
 
 nimbus-up:
 	docker run -d --name appsync-nimbus \
@@ -53,6 +49,48 @@ deploy-nimbus: build
 remove-nimbus:
 	cd infra && $(NIMBUS_ENV) forge remove --stage $(STAGE)
 
+# ── GraphQL round-trip test (Nimbus) ─────────────────────────────────────────
+# Uses the path-based execution endpoint: /_appsync/{apiId}/graphql
+# Nimbus v0.4.22+ emulates Lambda-backed resolvers and API_KEY auth.
+
+query-nimbus:
+	@API_ID=$$($(NIMBUS_CLI) appsync list-graphql-apis \
+		--query "graphqlApis[?name=='$(PREFIX)-Graph'].apiId | [0]" \
+		--output text) && \
+	API_KEY=$$($(NIMBUS_CLI) appsync list-api-keys --api-id $$API_ID \
+		--query "apiKeys[0].id" --output text) && \
+	BASE_URL="http://localhost:$(NIMBUS_PORT)/_appsync/$$API_ID/graphql" && \
+	echo "URL: $$BASE_URL" && \
+	echo "Key: $$API_KEY" && \
+	echo "" && \
+	echo "── createNote ──────────────────────────────────────────────────" && \
+	curl -sf -X POST "$$BASE_URL" \
+		-H "x-api-key: $$API_KEY" \
+		-H "Content-Type: application/json" \
+		-d '{"query":"mutation { createNote(id: \"note-1\", content: \"Hello from forge AppSync\") { id content createdAt } }"}' \
+		| jq . && \
+	echo "" && \
+	echo "── getNote ─────────────────────────────────────────────────────" && \
+	curl -sf -X POST "$$BASE_URL" \
+		-H "x-api-key: $$API_KEY" \
+		-H "Content-Type: application/json" \
+		-d '{"query":"query { getNote(id: \"note-1\") { id content createdAt } }"}' \
+		| jq . && \
+	echo "" && \
+	echo "── listNotes ───────────────────────────────────────────────────" && \
+	curl -sf -X POST "$$BASE_URL" \
+		-H "x-api-key: $$API_KEY" \
+		-H "Content-Type: application/json" \
+		-d '{"query":"query { listNotes { id content createdAt } }"}' \
+		| jq . && \
+	echo "" && \
+	echo "── deleteNote ──────────────────────────────────────────────────" && \
+	curl -sf -X POST "$$BASE_URL" \
+		-H "x-api-key: $$API_KEY" \
+		-H "Content-Type: application/json" \
+		-d '{"query":"mutation { deleteNote(id: \"note-1\") }"}' \
+		| jq .
+
 # ── Real AWS deploy / remove ──────────────────────────────────────────────────
 # Uses your default AWS credentials and region. Set STAGE before deploying:
 #   STAGE=prod make deploy
@@ -63,10 +101,10 @@ deploy: build
 remove:
 	cd infra && forge remove --stage $(STAGE)
 
-# ── GraphQL round-trip test ───────────────────────────────────────────────────
-# Requires real AWS (Nimbus does not yet emulate AppSync HTTP execution).
+# ── GraphQL round-trip test (real AWS) ───────────────────────────────────────
 # Sends a createNote mutation, getNote and listNotes queries, then deleteNote.
 # The API URL and key are looked up from AWS using the CLI after deploying.
+# For Nimbus, use query-nimbus instead.
 
 query:
 	@API_ID=$$(aws appsync list-graphql-apis \

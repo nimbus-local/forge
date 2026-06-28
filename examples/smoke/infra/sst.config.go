@@ -151,15 +151,19 @@ func main() {
 			gql := constructs.NewAppSync(ctx, "Graph", &constructs.AppSyncArgs{
 				Schema: `
 schema { query: Query mutation: Mutation }
-type Query    { echo(msg: String!): String }
+type Query    { echo(msg: String!): String  ping: String }
 type Mutation { createRecord(id: String!): String }
 `,
 				ApiKeyExpiry: "2027-01-01T00:00:00Z",
 				DataSources: []constructs.AppSyncDataSource{
 					{Name: "LambdaDS", Type: constructs.AppSyncDataSourceLambda, Function: fn},
+					{Name: "LocalDS", Type: constructs.AppSyncDataSourceNone},
 				},
 				Resolvers: []constructs.AppSyncResolver{
 					{TypeName: "Query", FieldName: "echo", DataSource: "LambdaDS"},
+					{TypeName: "Query", FieldName: "ping", DataSource: "LocalDS",
+						RequestTemplate:  `{}`,
+						ResponseTemplate: `"pong"`},
 					{TypeName: "Mutation", FieldName: "createRecord", DataSource: "LambdaDS"},
 				},
 			})

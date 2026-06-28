@@ -616,6 +616,23 @@ func TestNewAppSync_GrantCreatesIAMPolicy(t *testing.T) {
 	}
 }
 
+func TestNewAppSync_UnsupportedDataSourceTypePanics(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for unsupported data source type")
+		}
+	}()
+	runTest(t, func(ctx *forge.RunContext) {
+		NewAppSync(ctx, "MyApi", &AppSyncArgs{
+			Schema: testSchema,
+			DataSources: []AppSyncDataSource{
+				{Name: "Bad", Type: AppSyncDataSourceType("UNSUPPORTED")},
+			},
+		})
+	})
+}
+
 func TestNewAppSync_APIKeyExpiryOverride(t *testing.T) {
 	t.Parallel()
 	mocks := runTest(t, func(ctx *forge.RunContext) {
